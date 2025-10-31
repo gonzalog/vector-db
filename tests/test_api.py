@@ -55,7 +55,9 @@ class TestLibraryEndpoints:
         response = client.get("/api/v1/libraries")
         assert response.status_code == 200
         data = response.json()
-        assert len(data) == 2
+        assert "items" in data
+        assert len(data["items"]) == 2
+        assert data["total"] == 2
 
     def test_get_library_by_id(self):
         """Test getting a library by ID."""

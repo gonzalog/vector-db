@@ -9,6 +9,7 @@ from vector_db.models import (
     Library,
     LibraryCreate,
     LibraryUpdate,
+    PaginatedResponse,
 )
 from vector_db.repositories.memory_repository import (
     document_repository,
@@ -59,6 +60,31 @@ class LibraryService:
             List of all libraries
         """
         return library_repository.get_all()
+
+    def get_libraries_paginated(
+        self, skip: int = 0, limit: int = 100
+    ) -> PaginatedResponse[Library]:
+        """
+        Get libraries with pagination.
+
+        Args:
+            skip: Number of items to skip
+            limit: Maximum number of items to return
+
+        Returns:
+            Paginated response with libraries
+        """
+        items, total = library_repository.get_paginated(
+            skip=skip, limit=limit
+        )
+
+        return PaginatedResponse(
+            items=items,
+            total=total,
+            skip=skip,
+            limit=limit,
+            has_more=skip + len(items) < total,
+        )
 
     def update_library(
         self, library_id: UUID, library_update: LibraryUpdate

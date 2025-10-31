@@ -4,7 +4,7 @@ from datetime import datetime
 from uuid import UUID
 
 from vector_db.core.exceptions import NotFoundException
-from vector_db.models import Chunk, ChunkCreate, ChunkUpdate
+from vector_db.models import Chunk, ChunkCreate, ChunkUpdate, PaginatedResponse
 from vector_db.repositories.memory_repository import (
     chunk_repository,
     document_repository,
@@ -79,6 +79,50 @@ class ChunkService:
         """
         document = document_repository.get(document_id)
         return document.chunks
+
+    def get_chunks_paginated(
+        self,
+        document_id: UUID,
+        skip: int = 0,
+        limit: int = 100,
+        search: str | None = None,
+    ) -> PaginatedResponse[Chunk]:
+        """
+        Get chunks with pagination and optional search filtering.
+
+        Args:
+            document_id: The document ID
+            skip: Number of items to skip
+            limit: Maximum number of items to return
+            search: Optional search term to filter by text
+
+        Returns:
+            Paginated response with chunks
+
+        Raises:
+            NotFoundException: If document not found
+        """
+        # Verify document exists
+        document_repository.get(document_id)
+
+        def filter_fn(chunk: Chunk) -> bool:
+            if chunk.document_id != document_id:
+                return False
+            if not search:
+                return True
+            return search.lower() in chunk.text.lower()
+
+        items, total = chunk_repository.get_paginated(
+            skip=skip, limit=limit, filter_fn=filter_fn
+        )
+
+        return PaginatedResponse(
+            items=items,
+            total=total,
+            skip=skip,
+            limit=limit,
+            has_more=skip + len(items) < total,
+        )
 
     def update_chunk(self, chunk_id: UUID, chunk_update: ChunkUpdate) -> Chunk:
         """

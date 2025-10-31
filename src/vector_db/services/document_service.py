@@ -9,6 +9,7 @@ from vector_db.models import (
     Document,
     DocumentCreate,
     DocumentUpdate,
+    PaginatedResponse,
 )
 from vector_db.repositories.memory_repository import (
     chunk_repository,
@@ -96,6 +97,44 @@ class DocumentService:
         """
         library = library_repository.get(library_id)
         return library.documents
+
+    def get_documents_paginated(
+        self,
+        library_id: UUID,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> PaginatedResponse[Document]:
+        """
+        Get documents with pagination.
+
+        Args:
+            library_id: The library ID
+            skip: Number of items to skip
+            limit: Maximum number of items to return
+
+        Returns:
+            Paginated response with documents
+
+        Raises:
+            NotFoundException: If library not found
+        """
+        # Verify library exists
+        library_repository.get(library_id)
+
+        def filter_fn(document: Document) -> bool:
+            return document.library_id == library_id
+
+        items, total = document_repository.get_paginated(
+            skip=skip, limit=limit, filter_fn=filter_fn
+        )
+
+        return PaginatedResponse(
+            items=items,
+            total=total,
+            skip=skip,
+            limit=limit,
+            has_more=skip + len(items) < total,
+        )
 
     def update_document(
         self, document_id: UUID, document_update: DocumentUpdate

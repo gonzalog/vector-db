@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from threading import RLock
-from typing import Generic, TypeVar
+from typing import Callable, Generic, TypeVar
 from uuid import UUID
 
 from vector_db.core.exceptions import AlreadyExistsException, NotFoundException
@@ -71,6 +71,37 @@ class InMemoryRepository(Generic[T]):
         """
         with self._lock:
             return list(self._data.values())
+
+    def get_paginated(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        filter_fn: Callable[[T], bool] | None = None,
+    ) -> tuple[list[T], int]:
+        """
+        Get entities with pagination and optional filtering.
+
+        Args:
+            skip: Number of items to skip
+            limit: Maximum number of items to return
+            filter_fn: Optional filter function
+
+        Returns:
+            Tuple of (items, total_count)
+        """
+        with self._lock:
+            items = list(self._data.values())
+
+            # Apply filter if provided
+            if filter_fn:
+                items = [item for item in items if filter_fn(item)]
+
+            total = len(items)
+
+            # Apply pagination
+            paginated_items = items[skip : skip + limit]
+
+            return paginated_items, total
 
     def update(self, entity_id: UUID, entity: T) -> T:
         """

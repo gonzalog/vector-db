@@ -1,10 +1,17 @@
 """API endpoints for library operations."""
 
+from typing import Union
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Query, status
 
-from vector_db.models import Document, Library, LibraryCreate, LibraryUpdate
+from vector_db.models import (
+    Document,
+    Library,
+    LibraryCreate,
+    LibraryUpdate,
+    PaginatedResponse,
+)
 from vector_db.services.library_service import library_service
 
 router = APIRouter(prefix="/libraries", tags=["libraries"])
@@ -16,10 +23,17 @@ def create_library(library_create: LibraryCreate) -> Library:
     return library_service.create_library(library_create)
 
 
-@router.get("", response_model=list[Library], status_code=status.HTTP_200_OK)
-def get_all_libraries() -> list[Library]:
-    """Get all libraries."""
-    return library_service.get_all_libraries()
+@router.get(
+    "",
+    response_model=PaginatedResponse[Library],
+    status_code=status.HTTP_200_OK,
+)
+def get_all_libraries(
+    skip: int = Query(0, ge=0, description="Number of items to skip"),
+    limit: int = Query(50, ge=1, le=1000, description="Maximum items to return"),
+) -> PaginatedResponse[Library]:
+    """Get all libraries with pagination."""
+    return library_service.get_libraries_paginated(skip=skip, limit=limit)
 
 
 @router.get("/{library_id}", response_model=Library, status_code=status.HTTP_200_OK)

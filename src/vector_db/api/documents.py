@@ -1,10 +1,17 @@
 """API endpoints for document operations."""
 
+from typing import Union
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Query, status
 
-from vector_db.models import Chunk, Document, DocumentCreate, DocumentUpdate
+from vector_db.models import (
+    Chunk,
+    Document,
+    DocumentCreate,
+    DocumentUpdate,
+    PaginatedResponse,
+)
 from vector_db.services.document_service import document_service
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -22,10 +29,20 @@ def get_document(document_id: UUID) -> Document:
     return document_service.get_document(document_id)
 
 
-@router.get("", response_model=list[Document], status_code=status.HTTP_200_OK)
-def get_all_documents(library_id: UUID) -> list[Document]:
-    """Get all documents in a library."""
-    return document_service.get_all_documents(library_id)
+@router.get(
+    "",
+    response_model=PaginatedResponse[Document],
+    status_code=status.HTTP_200_OK,
+)
+def get_all_documents(
+    library_id: UUID,
+    skip: int = Query(0, ge=0, description="Number of items to skip"),
+    limit: int = Query(50, ge=1, le=1000, description="Maximum items to return"),
+) -> PaginatedResponse[Document]:
+    """Get all documents in a library with pagination."""
+    return document_service.get_documents_paginated(
+        library_id=library_id, skip=skip, limit=limit
+    )
 
 
 @router.put("/{document_id}", response_model=Document, status_code=status.HTTP_200_OK)

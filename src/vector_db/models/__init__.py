@@ -13,6 +13,10 @@ from vector_db.models.library import (
     LibraryMetadata,
     LibraryUpdate,
 )
+from vector_db.models.pagination import (
+    PaginatedResponse,
+    PaginationParams,
+)
 from vector_db.models.query import SearchResponse, SearchResult, VectorQuery
 
 __all__ = [
@@ -35,4 +39,7 @@ __all__ = [
     "VectorQuery",
     "SearchResult",
     "SearchResponse",
+    # Pagination models
+    "PaginationParams",
+    "PaginatedResponse",
 ]
