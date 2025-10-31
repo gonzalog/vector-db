@@ -391,3 +391,24 @@ class HNSWIndex(VectorIndex):
         """
         with self._lock.read():
             return len(self._chunks)
+
+    def __getstate__(self) -> dict:
+        """
+        Get state for pickling.
+
+        Excludes the lock since it can't be pickled.
+        """
+        state = self.__dict__.copy()
+        # Remove the lock - it will be recreated when unpickling
+        state.pop('_lock', None)
+        return state
+
+    def __setstate__(self, state: dict) -> None:
+        """
+        Set state for unpickling.
+
+        Recreates the lock.
+        """
+        self.__dict__.update(state)
+        # Recreate the lock
+        self._lock = ReadWriteLock()

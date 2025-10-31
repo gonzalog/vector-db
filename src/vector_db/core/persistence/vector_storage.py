@@ -33,9 +33,13 @@ class VectorStorage:
         path = self._get_path(library_id)
 
         # Atomic write: write to temp file, then rename
-        temp_path = path.with_suffix(".npy.tmp")
-        np.save(str(temp_path), vectors)
-        temp_path.rename(path)
+        # Note: np.save() automatically adds .npy extension
+        temp_path_without_ext = self.vectors_dir / f"{library_id}.tmp"
+        np.save(str(temp_path_without_ext), vectors)  # Creates library_id.tmp.npy
+
+        # Rename from library_id.tmp.npy to library_id.npy
+        temp_path_with_ext = Path(str(temp_path_without_ext) + ".npy")
+        temp_path_with_ext.rename(path)
 
     def load(self, library_id: str) -> Optional[np.ndarray]:
         """

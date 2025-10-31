@@ -16,16 +16,25 @@ class LibraryRepository:
 
     async def create(self, library: Library) -> None:
         """Create a new library."""
+        # Convert Pydantic models to dicts if needed
+        metadata_dict = None
+        if library.metadata:
+            metadata_dict = (
+                library.metadata.model_dump()
+                if hasattr(library.metadata, "model_dump")
+                else library.metadata
+            )
+
         await self.db.conn.execute(
             """
             INSERT INTO libraries (id, name, index_config, metadata, created_at)
             VALUES (?, ?, ?, ?, ?)
             """,
             (
-                library.id,
+                str(library.id),
                 library.name,
-                json.dumps(library.index_config),
-                json.dumps(library.metadata) if library.metadata else None,
+                json.dumps(library.index_config.model_dump()),
+                json.dumps(metadata_dict) if metadata_dict else None,
                 library.created_at.isoformat(),
             ),
         )
@@ -86,16 +95,25 @@ class DocumentRepository:
 
     async def create(self, document: Document) -> None:
         """Create a new document."""
+        # Convert Pydantic models to dicts if needed
+        metadata_dict = None
+        if document.metadata:
+            metadata_dict = (
+                document.metadata.model_dump()
+                if hasattr(document.metadata, "model_dump")
+                else document.metadata
+            )
+
         await self.db.conn.execute(
             """
             INSERT INTO documents (id, library_id, name, metadata, created_at)
             VALUES (?, ?, ?, ?, ?)
             """,
             (
-                document.id,
-                document.library_id,
+                str(document.id),
+                str(document.library_id),
                 document.name,
-                json.dumps(document.metadata) if document.metadata else None,
+                json.dumps(metadata_dict) if metadata_dict else None,
                 document.created_at.isoformat(),
             ),
         )
@@ -163,16 +181,25 @@ class ChunkRepository:
 
     async def create(self, chunk: Chunk, vector_index: int) -> None:
         """Create a new chunk."""
+        # Convert Pydantic models to dicts if needed
+        metadata_dict = None
+        if chunk.metadata:
+            metadata_dict = (
+                chunk.metadata.model_dump()
+                if hasattr(chunk.metadata, "model_dump")
+                else chunk.metadata
+            )
+
         await self.db.conn.execute(
             """
             INSERT INTO chunks (id, document_id, text, metadata, vector_index, created_at)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
             (
-                chunk.id,
-                chunk.document_id,
+                str(chunk.id),
+                str(chunk.document_id),
                 chunk.text,
-                json.dumps(chunk.metadata) if chunk.metadata else None,
+                json.dumps(metadata_dict) if metadata_dict else None,
                 vector_index,
                 chunk.created_at.isoformat(),
             ),
@@ -194,6 +221,7 @@ class ChunkRepository:
             id=row["id"],
             document_id=row["document_id"],
             text=row["text"],
+            embedding=[],  # Placeholder - actual embedding is in vector storage
             metadata=json.loads(row["metadata"]) if row["metadata"] else None,
             created_at=datetime.fromisoformat(row["created_at"]),
         )
@@ -217,6 +245,7 @@ class ChunkRepository:
                     id=row["id"],
                     document_id=row["document_id"],
                     text=row["text"],
+                    embedding=[],  # Placeholder - actual embedding is in vector storage
                     metadata=json.loads(row["metadata"]) if row["metadata"] else None,
                     created_at=datetime.fromisoformat(row["created_at"]),
                 ),
@@ -244,6 +273,7 @@ class ChunkRepository:
                     id=row["id"],
                     document_id=row["document_id"],
                     text=row["text"],
+                    embedding=[],  # Placeholder - actual embedding is in vector storage
                     metadata=json.loads(row["metadata"]) if row["metadata"] else None,
                     created_at=datetime.fromisoformat(row["created_at"]),
                 ),
