@@ -1,55 +1,12 @@
 """Tests for API endpoints."""
 
-import pytest
-import pytest_asyncio
-import tempfile
-import shutil
-from pathlib import Path
 from fastapi import status
-from fastapi.testclient import TestClient
-
-from vector_db.main import create_app
-from vector_db.core.persistence.database import init_database, close_database
-from vector_db.core.settings import Settings
-from vector_db.repositories.registry import initialize_repositories
-
-
-@pytest_asyncio.fixture
-async def temp_data_dir():
-    """Create a temporary data directory."""
-    temp_dir = Path(tempfile.mkdtemp())
-    yield temp_dir
-    shutil.rmtree(temp_dir)
-
-
-@pytest_asyncio.fixture
-async def app_with_persistence(temp_data_dir):
-    """Create app with persistence initialized."""
-    settings = Settings()
-    settings.DATA_DIR = temp_data_dir
-
-    # Initialize database and repositories
-    await init_database(settings.DATABASE_PATH)
-    await initialize_repositories()
-
-    app = create_app()
-
-    yield app
-
-    # Cleanup
-    await close_database()
-
-
-@pytest.fixture
-def client(app_with_persistence):
-    """Create test client."""
-    return TestClient(app_with_persistence, raise_server_exceptions=True)
 
 
 class TestLibraryEndpoints:
     """Tests for library CRUD endpoints."""
 
-    def test_create_library(self):
+    def test_create_library(self, client):
         """Test creating a library."""
         response = client.post(
             "/api/v1/libraries",
@@ -61,7 +18,7 @@ class TestLibraryEndpoints:
         assert data["metadata"]["description"] == "Test"
         assert "id" in data
 
-    def test_get_all_libraries(self):
+    def test_get_all_libraries(self, client):
         """Test getting all libraries."""
         # Create two libraries
         client.post(
@@ -80,7 +37,7 @@ class TestLibraryEndpoints:
         assert len(data["items"]) == 2
         assert data["total"] == 2
 
-    def test_get_library_by_id(self):
+    def test_get_library_by_id(self, client):
         """Test getting a library by ID."""
         create_response = client.post(
             "/api/v1/libraries",
@@ -94,14 +51,14 @@ class TestLibraryEndpoints:
         assert data["id"] == library_id
         assert data["name"] == "Test Library"
 
-    def test_get_library_not_found(self):
+    def test_get_library_not_found(self, client):
         """Test getting a non-existent library."""
         response = client.get(
             "/api/v1/libraries/00000000-0000-0000-0000-000000000000"
         )
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_update_library(self):
+    def test_update_library(self, client):
         """Test updating a library."""
         create_response = client.post(
             "/api/v1/libraries",
@@ -117,7 +74,7 @@ class TestLibraryEndpoints:
         data = response.json()
         assert data["name"] == "New Name"
 
-    def test_delete_library(self):
+    def test_delete_library(self, client):
         """Test deleting a library."""
         create_response = client.post(
             "/api/v1/libraries",
@@ -136,7 +93,7 @@ class TestLibraryEndpoints:
 class TestDocumentEndpoints:
     """Tests for document CRUD endpoints."""
 
-    def test_create_document(self):
+    def test_create_document(self, client):
         """Test creating a document."""
         # Create a library first
         library_response = client.post(
@@ -154,7 +111,7 @@ class TestDocumentEndpoints:
         assert data["name"] == "Test Document"
         assert data["library_id"] == library_id
 
-    def test_get_document_by_id(self):
+    def test_get_document_by_id(self, client):
         """Test getting a document by ID."""
         # Create library and document
         library_response = client.post(
@@ -174,7 +131,7 @@ class TestDocumentEndpoints:
         data = response.json()
         assert data["id"] == document_id
 
-    def test_update_document(self):
+    def test_update_document(self, client):
         """Test updating a document."""
         # Create library and document
         library_response = client.post(
@@ -197,7 +154,7 @@ class TestDocumentEndpoints:
         data = response.json()
         assert data["name"] == "New Name"
 
-    def test_delete_document(self):
+    def test_delete_document(self, client):
         """Test deleting a document."""
         # Create library and document
         library_response = client.post(
@@ -219,7 +176,7 @@ class TestDocumentEndpoints:
 class TestChunkEndpoints:
     """Tests for chunk CRUD endpoints."""
 
-    def test_create_chunk(self):
+    def test_create_chunk(self, client):
         """Test creating a chunk."""
         # Create library and document
         library_response = client.post(
@@ -246,7 +203,7 @@ class TestChunkEndpoints:
         assert data["text"] == "Test chunk text"
         assert data["document_id"] == document_id
 
-    def test_get_chunk_by_id(self):
+    def test_get_chunk_by_id(self, client):
         """Test getting a chunk by ID."""
         # Create library, document, and chunk
         library_response = client.post(
@@ -272,7 +229,7 @@ class TestChunkEndpoints:
         data = response.json()
         assert data["id"] == chunk_id
 
-    def test_update_chunk(self):
+    def test_update_chunk(self, client):
         """Test updating a chunk."""
         # Create library, document, and chunk
         library_response = client.post(
@@ -301,7 +258,7 @@ class TestChunkEndpoints:
         data = response.json()
         assert data["text"] == "New text"
 
-    def test_delete_chunk(self):
+    def test_delete_chunk(self, client):
         """Test deleting a chunk."""
         # Create library, document, and chunk
         library_response = client.post(

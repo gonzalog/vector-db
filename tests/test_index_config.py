@@ -1,35 +1,12 @@
 """Tests for index configuration in libraries."""
 
-import pytest
 from fastapi import status
-from fastapi.testclient import TestClient
-
-from vector_db.main import app
-from vector_db.repositories.memory_repository import (
-    chunk_repository,
-    document_repository,
-    library_repository,
-)
-
-client = TestClient(app)
-
-
-@pytest.fixture(autouse=True)
-def clear_repositories():
-    """Clear all repositories and indexes before each test."""
-    library_repository.clear()
-    document_repository.clear()
-    chunk_repository.clear()
-    yield
-    library_repository.clear()
-    document_repository.clear()
-    chunk_repository.clear()
 
 
 class TestIndexConfiguration:
     """Tests for index configuration in libraries."""
 
-    def test_create_library_with_default_index_config(self):
+    def test_create_library_with_default_index_config(self, client):
         """Test creating a library with default index configuration."""
         response = client.post(
             "/api/v1/libraries",
@@ -44,7 +21,7 @@ class TestIndexConfiguration:
         assert data["index_config"]["index_type"] == "flat"
         assert data["index_config"]["distance_metric"] == "cosine"
 
-    def test_create_library_with_flat_index(self):
+    def test_create_library_with_flat_index(self, client):
         """Test creating a library with flat index configuration."""
         response = client.post(
             "/api/v1/libraries",
@@ -63,7 +40,7 @@ class TestIndexConfiguration:
         assert data["index_config"]["index_type"] == "flat"
         assert data["index_config"]["distance_metric"] == "euclidean"
 
-    def test_create_library_with_lsh_index(self):
+    def test_create_library_with_lsh_index(self, client):
         """Test creating a library with LSH index configuration."""
         response = client.post(
             "/api/v1/libraries",
@@ -86,7 +63,7 @@ class TestIndexConfiguration:
         assert data["index_config"]["n_hash_tables"] == 5
         assert data["index_config"]["n_hash_bits"] == 8
 
-    def test_create_library_with_hnsw_index(self):
+    def test_create_library_with_hnsw_index(self, client):
         """Test creating a library with HNSW index configuration."""
         response = client.post(
             "/api/v1/libraries",
@@ -111,7 +88,7 @@ class TestIndexConfiguration:
         assert data["index_config"]["ef_construction"] == 200
         assert data["index_config"]["ef_search"] == 50
 
-    def test_index_created_on_library_creation(self):
+    def test_index_created_on_library_creation(self, client):
         """Test that index is created when library is created."""
         # Create library
         response = client.post(
@@ -132,7 +109,7 @@ class TestIndexConfiguration:
         assert "results" in data
         assert data["total_results"] == 0  # Empty library
 
-    def test_index_updated_on_chunk_add(self):
+    def test_index_updated_on_chunk_add(self, client):
         """Test that index is updated when chunks are added."""
         # Create library
         library_response = client.post(
@@ -169,7 +146,7 @@ class TestIndexConfiguration:
         assert data["total_results"] == 2
         assert len(data["results"]) == 2
 
-    def test_index_updated_on_chunk_delete(self):
+    def test_index_updated_on_chunk_delete(self, client):
         """Test that index is updated when chunks are deleted."""
         # Create library
         library_response = client.post(
@@ -217,7 +194,7 @@ class TestIndexConfiguration:
         assert search_response.status_code == status.HTTP_200_OK
         assert search_response.json()["total_results"] == 2
 
-    def test_index_deleted_on_library_delete(self):
+    def test_index_deleted_on_library_delete(self, client):
         """Test that index is deleted when library is deleted."""
         # Create library
         library_response = client.post(
@@ -244,7 +221,7 @@ class TestIndexConfiguration:
         )
         assert search_response.status_code == status.HTTP_404_NOT_FOUND
 
-    def test_search_uses_library_index_config(self):
+    def test_search_uses_library_index_config(self, client):
         """Test that search uses the library's configured index."""
         # Create library with HNSW index
         library_response = client.post(

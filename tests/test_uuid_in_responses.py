@@ -1,36 +1,13 @@
 """Tests to verify that all API endpoints include UUIDs in responses."""
 
-import pytest
 from fastapi import status
-from fastapi.testclient import TestClient
 from uuid import UUID
-
-from vector_db.main import app
-from vector_db.repositories.memory_repository import (
-    chunk_repository,
-    document_repository,
-    library_repository,
-)
-
-client = TestClient(app)
-
-
-@pytest.fixture(autouse=True)
-def clear_repositories():
-    """Clear all repositories before each test."""
-    library_repository.clear()
-    document_repository.clear()
-    chunk_repository.clear()
-    yield
-    library_repository.clear()
-    document_repository.clear()
-    chunk_repository.clear()
 
 
 class TestLibraryUUIDs:
     """Test that library endpoints include UUIDs."""
 
-    def test_create_library_returns_uuid(self):
+    def test_create_library_returns_uuid(self, client):
         """Test that creating a library returns its UUID."""
         response = client.post(
             "/api/v1/libraries",
@@ -46,7 +23,7 @@ class TestLibraryUUIDs:
         uuid_obj = UUID(data["id"])
         assert str(uuid_obj) == data["id"]
 
-    def test_get_library_returns_uuid(self):
+    def test_get_library_returns_uuid(self, client):
         """Test that getting a library returns its UUID."""
         # Create a library
         create_response = client.post(
@@ -64,7 +41,7 @@ class TestLibraryUUIDs:
         assert "id" in data
         assert data["id"] == library_id
 
-    def test_get_all_libraries_includes_uuids(self):
+    def test_get_all_libraries_includes_uuids(self, client):
         """Test that listing libraries includes UUIDs for all items."""
         # Create multiple libraries
         library_ids = []
@@ -93,7 +70,7 @@ class TestLibraryUUIDs:
             # Verify it's one of our created libraries
             assert item["id"] in library_ids
 
-    def test_update_library_returns_uuid(self):
+    def test_update_library_returns_uuid(self, client):
         """Test that updating a library returns its UUID."""
         # Create a library
         create_response = client.post(
@@ -118,7 +95,7 @@ class TestLibraryUUIDs:
 class TestDocumentUUIDs:
     """Test that document endpoints include UUIDs."""
 
-    def test_create_document_returns_uuid(self):
+    def test_create_document_returns_uuid(self, client):
         """Test that creating a document returns its UUID."""
         # Create a library first
         library_response = client.post(
@@ -145,7 +122,7 @@ class TestDocumentUUIDs:
         UUID(data["id"])
         UUID(data["library_id"])
 
-    def test_get_document_returns_uuid(self):
+    def test_get_document_returns_uuid(self, client):
         """Test that getting a document returns its UUID."""
         # Create library and document
         library_response = client.post(
@@ -171,7 +148,7 @@ class TestDocumentUUIDs:
         assert "library_id" in data
         assert data["library_id"] == library_id
 
-    def test_get_all_documents_includes_uuids(self):
+    def test_get_all_documents_includes_uuids(self, client):
         """Test that listing documents includes UUIDs for all items."""
         # Create a library
         library_response = client.post(
@@ -209,7 +186,7 @@ class TestDocumentUUIDs:
             # Verify it's one of our created documents
             assert item["id"] in document_ids
 
-    def test_update_document_returns_uuid(self):
+    def test_update_document_returns_uuid(self, client):
         """Test that updating a document returns its UUID."""
         # Create library and document
         library_response = client.post(
@@ -242,7 +219,7 @@ class TestDocumentUUIDs:
 class TestChunkUUIDs:
     """Test that chunk endpoints include UUIDs."""
 
-    def test_create_chunk_returns_uuid(self):
+    def test_create_chunk_returns_uuid(self, client):
         """Test that creating a chunk returns its UUID."""
         # Create library and document
         library_response = client.post(
@@ -278,7 +255,7 @@ class TestChunkUUIDs:
         UUID(data["id"])
         UUID(data["document_id"])
 
-    def test_get_chunk_returns_uuid(self):
+    def test_get_chunk_returns_uuid(self, client):
         """Test that getting a chunk returns its UUID."""
         # Create library, document, and chunk
         library_response = client.post(
@@ -313,7 +290,7 @@ class TestChunkUUIDs:
         assert "document_id" in data
         assert data["document_id"] == document_id
 
-    def test_get_all_chunks_includes_uuids(self):
+    def test_get_all_chunks_includes_uuids(self, client):
         """Test that listing chunks includes UUIDs for all items."""
         # Create library and document
         library_response = client.post(
@@ -359,7 +336,7 @@ class TestChunkUUIDs:
             # Verify it's one of our created chunks
             assert item["id"] in chunk_ids
 
-    def test_update_chunk_returns_uuid(self):
+    def test_update_chunk_returns_uuid(self, client):
         """Test that updating a chunk returns its UUID."""
         # Create library, document, and chunk
         library_response = client.post(
@@ -401,7 +378,7 @@ class TestChunkUUIDs:
 class TestSearchUUIDs:
     """Test that search endpoint includes UUIDs."""
 
-    def test_search_results_include_chunk_uuids(self):
+    def test_search_results_include_chunk_uuids(self, client):
         """Test that search results include chunk UUIDs."""
         # Create library
         library_response = client.post(
@@ -466,7 +443,7 @@ class TestSearchUUIDs:
 class TestNestedEntityUUIDs:
     """Test that nested entities include UUIDs."""
 
-    def test_library_documents_include_uuids(self):
+    def test_library_documents_include_uuids(self, client):
         """Test that documents nested in library response include UUIDs."""
         # Create library with document
         library_response = client.post(
@@ -498,7 +475,7 @@ class TestNestedEntityUUIDs:
                 assert doc["library_id"] == library_id
                 UUID(doc["id"])
 
-    def test_document_chunks_include_uuids(self):
+    def test_document_chunks_include_uuids(self, client):
         """Test that chunks nested in document response include UUIDs."""
         # Create library
         library_response = client.post(

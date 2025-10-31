@@ -2,36 +2,15 @@
 
 import pytest
 from fastapi import status
-from fastapi.testclient import TestClient
 
 from vector_db.indexes import DistanceMetric, FlatIndex, HNSWIndex, LSHIndex
-from vector_db.main import app
 from vector_db.models import Chunk
-from vector_db.repositories.memory_repository import (
-    chunk_repository,
-    document_repository,
-    library_repository,
-)
-
-client = TestClient(app)
-
-
-@pytest.fixture(autouse=True)
-def clear_repositories():
-    """Clear all repositories and indexes before each test."""
-    library_repository.clear()
-    document_repository.clear()
-    chunk_repository.clear()
-    yield
-    library_repository.clear()
-    document_repository.clear()
-    chunk_repository.clear()
 
 
 class TestDistanceMetrics:
     """Tests for distance metric functions."""
 
-    def test_cosine_similarity(self):
+    def test_cosine_similarity(self, client):
         """Test cosine similarity calculation."""
         from vector_db.indexes.distance import cosine_similarity
 
@@ -44,7 +23,7 @@ class TestDistanceMetrics:
         # Opposite vectors
         assert cosine_similarity([1.0, 0.0], [-1.0, 0.0]) == pytest.approx(-1.0)
 
-    def test_euclidean_distance(self):
+    def test_euclidean_distance(self, client):
         """Test Euclidean distance calculation."""
         from vector_db.indexes.distance import euclidean_distance
 
@@ -58,7 +37,7 @@ class TestDistanceMetrics:
 class TestFlatIndex:
     """Tests for flat (brute-force) index."""
 
-    def test_add_and_search(self):
+    def test_add_and_search(self, client):
         """Test adding chunks and searching."""
         index = FlatIndex()
 
@@ -93,7 +72,7 @@ class TestFlatIndex:
         assert results[0][0].id == chunk1.id  # Closest match
         assert results[0][1] < results[1][1]  # Distance increases
 
-    def test_add_batch(self):
+    def test_add_batch(self, client):
         """Test batch addition."""
         index = FlatIndex()
 
@@ -109,7 +88,7 @@ class TestFlatIndex:
         index.add_batch(chunks)
         assert index.size() == 10
 
-    def test_metadata_filtering(self):
+    def test_metadata_filtering(self, client):
         """Test search with metadata filtering."""
         index = FlatIndex()
 
@@ -143,7 +122,7 @@ class TestFlatIndex:
         assert len(results) == 1
         assert results[0][0].id == chunk1.id
 
-    def test_remove_chunk(self):
+    def test_remove_chunk(self, client):
         """Test removing chunks from index."""
         index = FlatIndex()
 
@@ -165,7 +144,7 @@ class TestFlatIndex:
         removed = index.remove(chunk.id)
         assert removed is False
 
-    def test_clear(self):
+    def test_clear(self, client):
         """Test clearing the index."""
         index = FlatIndex()
 
@@ -188,7 +167,7 @@ class TestFlatIndex:
 class TestLSHIndex:
     """Tests for LSH (Locality-Sensitive Hashing) index."""
 
-    def test_add_and_search(self):
+    def test_add_and_search(self, client):
         """Test adding chunks and searching with LSH."""
         index = LSHIndex(n_hash_tables=3, n_hash_bits=4)
 
@@ -213,7 +192,7 @@ class TestLSHIndex:
         # LSH is approximate, so we just check we got results
         assert len(results) > 0
 
-    def test_metadata_filtering(self):
+    def test_metadata_filtering(self, client):
         """Test LSH search with metadata filtering."""
         from vector_db.models import ChunkMetadata
 
@@ -242,7 +221,7 @@ class TestLSHIndex:
 class TestHNSWIndex:
     """Tests for HNSW (Hierarchical Navigable Small World) index."""
 
-    def test_add_and_search(self):
+    def test_add_and_search(self, client):
         """Test adding chunks and searching with HNSW."""
         index = HNSWIndex(M=8, ef_construction=100, ef_search=50)
 
@@ -266,7 +245,7 @@ class TestHNSWIndex:
         assert len(results) <= 3
         assert len(results) > 0  # HNSW is approximate, so we just check we got results
 
-    def test_metadata_filtering(self):
+    def test_metadata_filtering(self, client):
         """Test HNSW search with metadata filtering."""
         from vector_db.models import ChunkMetadata
 
@@ -293,7 +272,7 @@ class TestHNSWIndex:
 class TestSearchAPI:
     """Tests for search API endpoint."""
 
-    def test_search_endpoint(self):
+    def test_search_endpoint(self, client):
         """Test vector search endpoint."""
         # Create library
         library_response = client.post(
@@ -343,7 +322,7 @@ class TestSearchAPI:
             assert "score" in result
             assert "distance" in result
 
-    def test_search_with_metadata_filter(self):
+    def test_search_with_metadata_filter(self, client):
         """Test search with metadata filtering."""
         # Create library
         library_response = client.post(
@@ -389,7 +368,7 @@ class TestSearchAPI:
         # Should only return chunks with category A
         assert len(data["results"]) == 3
 
-    def test_search_empty_library(self):
+    def test_search_empty_library(self, client):
         """Test searching an empty library."""
         # Create library
         library_response = client.post(

@@ -1,35 +1,12 @@
 """Tests for pagination."""
 
-import pytest
 from fastapi import status
-from fastapi.testclient import TestClient
-
-from vector_db.main import app
-from vector_db.repositories.memory_repository import (
-    chunk_repository,
-    document_repository,
-    library_repository,
-)
-
-client = TestClient(app)
-
-
-@pytest.fixture(autouse=True)
-def clear_repositories():
-    """Clear all repositories before each test."""
-    library_repository.clear()
-    document_repository.clear()
-    chunk_repository.clear()
-    yield
-    library_repository.clear()
-    document_repository.clear()
-    chunk_repository.clear()
 
 
 class TestLibraryPagination:
     """Tests for library pagination."""
 
-    def test_library_pagination_defaults(self):
+    def test_library_pagination_defaults(self, client):
         """Test library pagination with default parameters."""
         # Create 3 libraries
         for i in range(3):
@@ -48,7 +25,7 @@ class TestLibraryPagination:
         assert data["limit"] == 50
         assert data["has_more"] is False
 
-    def test_library_pagination(self):
+    def test_library_pagination(self, client):
         """Test library pagination with custom parameters."""
         # Create 5 libraries
         for i in range(5):
@@ -89,7 +66,7 @@ class TestLibraryPagination:
 class TestDocumentPagination:
     """Tests for document pagination."""
 
-    def test_document_pagination(self):
+    def test_document_pagination(self, client):
         """Test document pagination."""
         # Create a library
         library_response = client.post(
