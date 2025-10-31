@@ -78,6 +78,27 @@ class LibraryRepository:
             for row in rows
         ]
 
+    async def update(self, library_id: str, library: Library) -> None:
+        """Update a library."""
+        metadata_dict = None
+        if library.metadata:
+            metadata_dict = (
+                library.metadata.model_dump()
+                if hasattr(library.metadata, "model_dump")
+                else library.metadata
+            )
+
+        await self.db.conn.execute(
+            "UPDATE libraries SET name = ?, metadata = ?, index_config = ? WHERE id = ?",
+            (
+                library.name,
+                json.dumps(metadata_dict) if metadata_dict else None,
+                json.dumps(library.index_config.model_dump()),
+                str(library_id),
+            ),
+        )
+        await self.db.conn.commit()
+
     async def delete(self, library_id: str) -> None:
         """Delete a library (cascades to documents and chunks)."""
         await self.db.conn.execute(

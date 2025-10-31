@@ -14,16 +14,16 @@ from vector_db.models import (
     SearchResponse,
     VectorQuery,
 )
-from vector_db.repositories.memory_repository import library_repository
+from vector_db.repositories.registry import get_library_repository
 from vector_db.services.library_service import library_service
 
 router = APIRouter(prefix="/libraries", tags=["libraries"])
 
 
 @router.post("", response_model=Library, status_code=status.HTTP_201_CREATED)
-def create_library(library_create: LibraryCreate) -> Library:
+async def create_library(library_create: LibraryCreate) -> Library:
     """Create a new library."""
-    return library_service.create_library(library_create)
+    return await library_service.create_library(library_create)
 
 
 @router.get(
@@ -46,15 +46,15 @@ def get_library(library_id: UUID) -> Library:
 
 
 @router.put("/{library_id}", response_model=Library, status_code=status.HTTP_200_OK)
-def update_library(library_id: UUID, library_update: LibraryUpdate) -> Library:
+async def update_library(library_id: UUID, library_update: LibraryUpdate) -> Library:
     """Update a library."""
-    return library_service.update_library(library_id, library_update)
+    return await library_service.update_library(library_id, library_update)
 
 
 @router.delete("/{library_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_library(library_id: UUID) -> None:
+async def delete_library(library_id: UUID) -> None:
     """Delete a library."""
-    library_service.delete_library(library_id)
+    await library_service.delete_library(library_id)
 
 
 @router.get(
@@ -74,4 +74,5 @@ def get_library_documents(library_id: UUID) -> list[Document]:
 )
 def search_library(library_id: UUID, query: VectorQuery) -> SearchResponse:
     """Search for similar vectors in a library."""
-    return library_repository.search(library_id, query)
+    library_repo = get_library_repository()
+    return library_repo.search(library_id, query)

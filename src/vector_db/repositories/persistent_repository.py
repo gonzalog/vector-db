@@ -202,6 +202,25 @@ class PersistentLibraryRepository:
             paginated_items = items[skip : skip + limit]
             return paginated_items, total
 
+    async def update(self, entity_id: UUID, entity: Library) -> Library:
+        """Update a library."""
+        with self._global_lock:
+            if entity_id not in self._libraries:
+                raise NotFoundException(
+                    f"Entity with id {entity_id} not found",
+                    {"id": str(entity_id)},
+                )
+
+            # Update in database
+            db = get_database()
+            lib_repo = DBLibraryRepository(db)
+            await lib_repo.update(str(entity_id), entity)
+
+            # Update in memory cache
+            self._libraries[entity_id] = entity
+
+            return entity
+
     async def delete(self, entity_id: UUID) -> None:
         """Delete a library and all associated data."""
         with self._global_lock:

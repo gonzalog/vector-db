@@ -11,16 +11,16 @@ from vector_db.models import (
     LibraryUpdate,
     PaginatedResponse,
 )
-from vector_db.repositories.memory_repository import (
-    document_repository,
-    library_repository,
+from vector_db.repositories.registry import (
+    get_library_repository,
+    get_document_repository,
 )
 
 
 class LibraryService:
     """Service for managing libraries."""
 
-    def create_library(self, library_create: LibraryCreate) -> Library:
+    async def create_library(self, library_create: LibraryCreate) -> Library:
         """
         Create a new library.
 
@@ -37,7 +37,8 @@ class LibraryService:
             documents=[],
         )
         # Repository handles index creation
-        library = library_repository.create(library)
+        library_repo = get_library_repository()
+        library = await library_repo.create(library)
         return library
 
     def get_library(self, library_id: UUID) -> Library:
@@ -53,7 +54,8 @@ class LibraryService:
         Raises:
             NotFoundException: If library not found
         """
-        return library_repository.get(library_id)
+        library_repo = get_library_repository()
+        return library_repo.get(library_id)
 
     def get_all_libraries(self) -> list[Library]:
         """
@@ -62,7 +64,8 @@ class LibraryService:
         Returns:
             List of all libraries
         """
-        return library_repository.get_all()
+        library_repo = get_library_repository()
+        return library_repo.get_all()
 
     def get_libraries_paginated(
         self, skip: int = 0, limit: int = 100
@@ -77,7 +80,8 @@ class LibraryService:
         Returns:
             Paginated response with libraries
         """
-        items, total = library_repository.get_paginated(
+        library_repo = get_library_repository()
+        items, total = library_repo.get_paginated(
             skip=skip, limit=limit
         )
 
@@ -89,7 +93,7 @@ class LibraryService:
             has_more=skip + len(items) < total,
         )
 
-    def update_library(
+    async def update_library(
         self, library_id: UUID, library_update: LibraryUpdate
     ) -> Library:
         """
@@ -105,7 +109,8 @@ class LibraryService:
         Raises:
             NotFoundException: If library not found
         """
-        library = library_repository.get(library_id)
+        library_repo = get_library_repository()
+        library = library_repo.get(library_id)
 
         if library_update.name is not None:
             library.name = library_update.name
@@ -113,9 +118,9 @@ class LibraryService:
             library.metadata = library_update.metadata
 
         library.updated_at = datetime.utcnow()
-        return library_repository.update(library_id, library)
+        return await library_repo.update(library_id, library)
 
-    def delete_library(self, library_id: UUID) -> None:
+    async def delete_library(self, library_id: UUID) -> None:
         """
         Delete a library and all its documents.
 
@@ -125,17 +130,20 @@ class LibraryService:
         Raises:
             NotFoundException: If library not found
         """
-        library = library_repository.get(library_id)
+        library_repo = get_library_repository()
+        document_repo = get_document_repository()
+
+        library = library_repo.get(library_id)
 
         # Delete all documents in the library
         for document in library.documents:
             try:
-                document_repository.delete(document.id)
+                document_repo.delete(document.id)
             except NotFoundException:
                 pass
 
         # Repository handles index deletion
-        library_repository.delete(library_id)
+        await library_repo.delete(library_id)
 
     def get_documents(self, library_id: UUID) -> list[Document]:
         """
@@ -150,7 +158,8 @@ class LibraryService:
         Raises:
             NotFoundException: If library not found
         """
-        library = library_repository.get(library_id)
+        library_repo = get_library_repository()
+        library = library_repo.get(library_id)
         return library.documents
 
 
