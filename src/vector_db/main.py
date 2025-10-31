@@ -94,8 +94,11 @@ def register_exception_handlers(app: FastAPI) -> None:
 
 def register_routers(app: FastAPI) -> None:
     """Register API routers."""
-    # TODO: Add API routers here
-    pass
+    from vector_db.api import chunks, documents, libraries
+
+    app.include_router(libraries.router, prefix=settings.API_V1_PREFIX)
+    app.include_router(documents.router, prefix=settings.API_V1_PREFIX)
+    app.include_router(chunks.router, prefix=settings.API_V1_PREFIX)
 
 
 # Create the FastAPI app
