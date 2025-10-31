@@ -6,12 +6,11 @@ This directory contains example scripts demonstrating how to use the Vector Data
 
 1. **Install dependencies:**
    ```bash
-   # Install example dependencies (cohere is optional, only for examples)
-   uv add --optional cohere requests python-dotenv
-
-   # Or if you want to install globally for the examples:
-   uv pip install cohere requests python-dotenv
+   # Install required dependencies for examples
+   uv add cohere requests python-dotenv
    ```
+
+   Note: `cohere`, `requests`, and `python-dotenv` are only needed to run the example scripts.
 
 2. **Configure environment variables:**
    ```bash
@@ -188,10 +187,19 @@ RECOMMENDATIONS
 ## Tuning Parameters
 
 ### LSH Parameters
-- `n_hash_tables`: More tables = better recall, more memory
-  - Start with 5, increase if recall is too low
-- `n_hash_bits`: More bits = more buckets, fewer collisions
-  - Start with 8, adjust based on dataset size
+- `n_hash_tables`: **Most important for recall!**
+  - More tables = higher probability of finding similar vectors
+  - Each table uses different random hyperplanes
+  - A match in ANY table makes a vector a candidate
+  - **Recommended**: Start with 10-15 tables for good recall
+  - Trade-off: More tables = more memory + slightly slower queries
+- `n_hash_bits`: Controls granularity (2^n_hash_bits = number of buckets per table)
+  - **Critical**: Must match your dataset size!
+  - Too many bits = too many buckets = data spread too thin = 0% recall
+  - **Small datasets (<100 vectors)**: Use 4 bits (16 buckets)
+  - **Medium datasets (100-10k vectors)**: Use 6-8 bits (64-256 buckets)
+  - **Large datasets (>10k vectors)**: Use 8-10 bits (256-1024 buckets)
+  - Rule of thumb: aim for ~5-10 vectors per bucket on average
 
 ### HNSW Parameters
 - `M`: Connections per node

@@ -8,7 +8,7 @@ This script demonstrates:
 4. Performing similarity searches
 
 Requirements:
-    uv pip install cohere requests python-dotenv
+    uv add cohere requests python-dotenv
 
 Usage:
     1. Copy .env.example to .env and add your Cohere API key
@@ -196,7 +196,7 @@ def main():
 
             print(f"\n  {i}. Score: {score:.4f} | Distance: {distance:.4f}")
             print(f"     Text: {chunk['text']}")
-            print(f"     Document: {chunk['metadata'].get('custom', {}).get('document_name', 'Unknown')}")
+            print(f"     Document: {chunk['metadata'].get('document_name', 'Unknown')}")
 
     print()
     print("=" * 80)

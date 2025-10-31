@@ -8,7 +8,7 @@ This script:
 4. Provides recommendations based on the results
 
 Requirements:
-    uv pip install cohere requests python-dotenv
+    uv add cohere requests python-dotenv
 
 Usage:
     1. Copy .env.example to .env and add your Cohere API key
@@ -101,12 +101,13 @@ SENTENCES = [
 ]
 
 # Query sentences to test recall
+# Note: Queries should be specific enough to avoid cross-category semantic matches
 QUERY_SENTENCES = [
-    "AI and machine learning are changing technology",  # Should match tech
-    "DNA and genetics explain heredity",  # Should match science
-    "Forests produce oxygen and support wildlife",  # Should match nature
-    "Paintings and visual art express creativity",  # Should match arts
-    "Pasta and Mediterranean cooking traditions",  # Should match food
+    "Neural networks and deep learning algorithms for computer vision",  # Should match tech
+    "Genetic code in DNA and biological evolution",  # Should match science
+    "Rainforest ecosystems and biodiversity conservation",  # Should match nature
+    "Artistic expression through painting and sculpture",  # Should match arts
+    "Italian pasta dishes and Mediterranean cuisine",  # Should match food
 ]
 
 # Expected categories for queries (for recall calculation)
@@ -205,12 +206,15 @@ def search(library_id: str, query_embedding: list[float], k: int = 5) -> tuple[l
     return response.json()["results"], query_time
 
 
-def calculate_recall(results: list[dict], expected_category: str, k: int = 5) -> float:
-    """Calculate recall - how many results match the expected category."""
-    matching = sum(
-        1 for result in results[:k]
-        if result["chunk"]["metadata"].get("custom", {}).get("category") == expected_category
-    )
+def calculate_recall(results: list[dict], ground_truth_indices: set[int], k: int = 5) -> float:
+    """
+    Calculate recall against ground truth (flat index results).
+
+    Measures how many of the ground truth top-k results were found.
+    Compares using metadata.index since chunk IDs differ across libraries.
+    """
+    result_indices = {r["chunk"]["metadata"]["index"] for r in results[:k]}
+    matching = len(result_indices & ground_truth_indices)
     return matching / k
 
 
@@ -235,6 +239,25 @@ def run_benchmark():
     print(f"✓ Generated {len(query_embeddings)} query embeddings")
     print()
 
+    # Step 2: Compute ground truth using Flat index with cosine distance
+    print("Step 2: Computing ground truth (Flat-Cosine index)...")
+    ground_truth_lib_id = create_library("Ground Truth (Flat-Cosine)", {
+        "index_type": "flat",
+        "distance_metric": "cosine"
+    })
+    add_documents(ground_truth_lib_id, SENTENCES, sentence_embeddings)
+
+    # Get ground truth top-5 results for each query
+    ground_truth_results = []
+    for query_embedding in query_embeddings:
+        results, _ = search(ground_truth_lib_id, query_embedding, k=5)
+        # Store the indices of top-5 results (using metadata.index)
+        ground_truth_indices = {r["chunk"]["metadata"]["index"] for r in results}
+        ground_truth_results.append(ground_truth_indices)
+
+    print(f"✓ Computed ground truth for {len(query_embeddings)} queries")
+    print()
+
     # Index configurations to test
     configurations = [
         # Flat index with different distance metrics
@@ -243,9 +266,12 @@ def run_benchmark():
         {"index_type": "flat", "distance_metric": "dot_product"},
 
         # LSH index with different configurations
-        {"index_type": "lsh", "distance_metric": "cosine", "n_hash_tables": 3, "n_hash_bits": 4},
-        {"index_type": "lsh", "distance_metric": "cosine", "n_hash_tables": 5, "n_hash_bits": 8},
-        {"index_type": "lsh", "distance_metric": "euclidean", "n_hash_tables": 5, "n_hash_bits": 8},
+        # Note: More hash tables = higher recall (more chances to match buckets)
+        # Fewer bits = fewer buckets = better for small datasets
+        {"index_type": "lsh", "distance_metric": "cosine", "n_hash_tables": 5, "n_hash_bits": 4},
+        {"index_type": "lsh", "distance_metric": "cosine", "n_hash_tables": 10, "n_hash_bits": 4},
+        {"index_type": "lsh", "distance_metric": "cosine", "n_hash_tables": 15, "n_hash_bits": 4},
+        {"index_type": "lsh", "distance_metric": "euclidean", "n_hash_tables": 10, "n_hash_bits": 4},
 
         # HNSW index with different configurations
         {"index_type": "hnsw", "distance_metric": "cosine", "M": 8, "ef_construction": 50, "ef_search": 20},
@@ -283,13 +309,13 @@ def run_benchmark():
             query_times.append(query_time)
             total_query_time += query_time
 
-            expected_category = EXPECTED_CATEGORIES[i]
-            recall = calculate_recall(search_results, expected_category, k=5)
+            # Compare against ground truth
+            ground_truth_indices = ground_truth_results[i]
+            recall = calculate_recall(search_results, ground_truth_indices, k=5)
             total_recall += recall
 
             print(f"  Query {i+1}: '{query_text[:50]}...'")
-            print(f"    Expected: {expected_category}")
-            print(f"    Recall@5: {recall:.2%}")
+            print(f"    Recall@5: {recall:.2%} (vs Flat-Cosine ground truth)")
             print(f"    Query time: {query_time*1000:.2f}ms")
 
         avg_recall = total_recall / len(QUERY_SENTENCES)
