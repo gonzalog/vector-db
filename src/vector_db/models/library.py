@@ -6,7 +6,6 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from vector_db.models.document import Document, DocumentCreate
 
 
 class IndexConfig(BaseModel):
@@ -60,9 +59,6 @@ class Library(BaseModel):
         default_factory=uuid4, description="Unique identifier for the library"
     )
     name: str = Field(..., min_length=1, description="Name of the library")
-    documents: list[Document] = Field(
-        default_factory=list, description="Documents in the library"
-    )
     metadata: LibraryMetadata = Field(
         default_factory=LibraryMetadata, description="Associated metadata"
     )
@@ -97,9 +93,6 @@ class LibraryCreate(BaseModel):
     """Schema for creating a new library."""
 
     name: str = Field(..., min_length=1, description="Name of the library")
-    documents: list[DocumentCreate] = Field(
-        default_factory=list, description="Initial documents for the library"
-    )
     metadata: LibraryMetadata = Field(
         default_factory=LibraryMetadata, description="Associated metadata"
     )

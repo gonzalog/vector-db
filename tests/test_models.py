@@ -71,7 +71,7 @@ class TestDocumentModels:
             tags=["test"],
         )
         document = Document(
-            library_id=lib_id, name="test_doc", metadata=metadata, chunks=[]
+            library_id=lib_id, name="test_doc", metadata=metadata
         )
 
         assert isinstance(document.id, UUID)
@@ -79,25 +79,21 @@ class TestDocumentModels:
         assert document.name == "test_doc"
         assert document.metadata.title == "Test Document"
         assert document.metadata.author == "John Doe"
-        assert len(document.chunks) == 0
 
     def test_document_create_schema(self):
         """Test DocumentCreate schema validation."""
-        chunk = ChunkCreate(text="Sample text", embedding=[0.1, 0.2, 0.3])
         doc_create = DocumentCreate(
             name="test_doc",
-            chunks=[chunk],
             metadata=DocumentMetadata(title="Test"),
         )
 
         assert doc_create.name == "test_doc"
-        assert len(doc_create.chunks) == 1
         assert doc_create.metadata.title == "Test"
 
     def test_document_name_validation(self):
         """Test that empty name is not allowed."""
         with pytest.raises(ValueError):
-            DocumentCreate(name="", chunks=[])
+            DocumentCreate(name="")
 
 
 class TestLibraryModels:
@@ -112,13 +108,12 @@ class TestLibraryModels:
             embedding_model="cohere-embed-english-v3.0",
             embedding_dimension=1024,
         )
-        library = Library(name="test_library", metadata=metadata, documents=[])
+        library = Library(name="test_library", metadata=metadata)
 
         assert isinstance(library.id, UUID)
         assert library.name == "test_library"
         assert library.metadata.description == "Test library"
         assert library.metadata.embedding_dimension == 1024
-        assert len(library.documents) == 0
 
     def test_library_create_schema(self):
         """Test LibraryCreate schema validation."""
@@ -129,7 +124,6 @@ class TestLibraryModels:
 
         assert lib_create.name == "test_library"
         assert lib_create.metadata.description == "Test"
-        assert len(lib_create.documents) == 0
 
     def test_library_name_validation(self):
         """Test that empty name is not allowed."""

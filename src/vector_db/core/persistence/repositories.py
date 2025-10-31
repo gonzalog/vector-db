@@ -185,6 +185,35 @@ class DocumentRepository:
             for row in rows
         ]
 
+    async def update(self, document_id: str, document: Document) -> None:
+        """Update a document."""
+        metadata_dict = None
+        if document.metadata:
+            metadata_dict = (
+                document.metadata.model_dump()
+                if hasattr(document.metadata, "model_dump")
+                else document.metadata
+            )
+
+        await self.db.conn.execute(
+            "UPDATE documents SET name = ?, metadata = ? WHERE id = ?",
+            (
+                document.name,
+                json.dumps(metadata_dict) if metadata_dict else None,
+                str(document_id),
+            ),
+        )
+        await self.db.conn.commit()
+
+    async def count_by_library(self, library_id: str) -> int:
+        """Count documents in a library."""
+        async with self.db.conn.execute(
+            "SELECT COUNT(*) as count FROM documents WHERE library_id = ?",
+            (library_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+        return row["count"] if row else 0
+
     async def delete(self, document_id: str) -> None:
         """Delete a document (cascades to chunks)."""
         await self.db.conn.execute(
@@ -302,6 +331,35 @@ class ChunkRepository:
             )
             for row in rows
         ]
+
+    async def update(self, chunk_id: str, chunk: Chunk) -> None:
+        """Update a chunk."""
+        metadata_dict = None
+        if chunk.metadata:
+            metadata_dict = (
+                chunk.metadata.model_dump()
+                if hasattr(chunk.metadata, "model_dump")
+                else chunk.metadata
+            )
+
+        await self.db.conn.execute(
+            "UPDATE chunks SET text = ?, metadata = ? WHERE id = ?",
+            (
+                chunk.text,
+                json.dumps(metadata_dict) if metadata_dict else None,
+                str(chunk_id),
+            ),
+        )
+        await self.db.conn.commit()
+
+    async def count_by_document(self, document_id: str) -> int:
+        """Count chunks in a document."""
+        async with self.db.conn.execute(
+            "SELECT COUNT(*) as count FROM chunks WHERE document_id = ?",
+            (document_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+        return row["count"] if row else 0
 
     async def delete(self, chunk_id: str) -> None:
         """Delete a chunk."""

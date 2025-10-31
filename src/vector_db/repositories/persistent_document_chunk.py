@@ -76,15 +76,38 @@ class PersistentDocumentRepository:
         db = get_database()
         doc_repo = DBDocumentRepository(db)
         documents = await doc_repo.list_by_library(str(library_id), skip, limit)
+        total = await doc_repo.count_by_library(str(library_id))
 
         # Cache them
         with self._lock:
             for doc in documents:
                 self._cache[doc.id] = doc
 
-        # For total count, we'd need a separate query (simplified here)
-        total = len(documents)  # This is wrong but acceptable for now
         return documents, total
+
+    async def update(self, entity_id: UUID, entity: Document) -> Document:
+        """Update a document."""
+        with self._lock:
+            db = get_database()
+            doc_repo = DBDocumentRepository(db)
+            await doc_repo.update(str(entity_id), entity)
+
+            self._cache[entity_id] = entity
+            return entity
+
+    def get_paginated(self, skip: int = 0, limit: int = 100, filter_fn=None) -> tuple[list[Document], int]:
+        """Get documents with optional filtering (operates on cache)."""
+        with self._lock:
+            all_docs = list(self._cache.values())
+
+            if filter_fn:
+                filtered = [doc for doc in all_docs if filter_fn(doc)]
+            else:
+                filtered = all_docs
+
+            total = len(filtered)
+            items = filtered[skip:skip + limit]
+            return items, total
 
     async def delete(self, entity_id: UUID) -> None:
         """Delete a document."""
@@ -166,6 +189,30 @@ class PersistentChunkRepository:
                 self._cache[chunk.id] = chunk
 
         return chunks
+
+    async def update(self, entity_id: UUID, entity: Chunk) -> Chunk:
+        """Update a chunk."""
+        with self._lock:
+            db = get_database()
+            chunk_repo = DBChunkRepository(db)
+            await chunk_repo.update(str(entity_id), entity)
+
+            self._cache[entity_id] = entity
+            return entity
+
+    def get_paginated(self, skip: int = 0, limit: int = 100, filter_fn=None) -> tuple[list[Chunk], int]:
+        """Get chunks with optional filtering (operates on cache)."""
+        with self._lock:
+            all_chunks = list(self._cache.values())
+
+            if filter_fn:
+                filtered = [chunk for chunk in all_chunks if filter_fn(chunk)]
+            else:
+                filtered = all_chunks
+
+            total = len(filtered)
+            items = filtered[skip:skip + limit]
+            return items, total
 
     async def delete(self, entity_id: UUID) -> None:
         """Delete a chunk."""

@@ -6,7 +6,6 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from vector_db.models.chunk import Chunk, ChunkCreate
 
 
 class DocumentMetadata(BaseModel):
@@ -31,9 +30,6 @@ class Document(BaseModel):
     )
     library_id: UUID = Field(..., description="ID of the parent library")
     name: str = Field(..., min_length=1, description="Name of the document")
-    chunks: list[Chunk] = Field(
-        default_factory=list, description="Chunks that make up the document"
-    )
     metadata: DocumentMetadata = Field(
         default_factory=DocumentMetadata, description="Associated metadata"
     )
@@ -64,9 +60,6 @@ class DocumentCreate(BaseModel):
     """Schema for creating a new document."""
 
     name: str = Field(..., min_length=1, description="Name of the document")
-    chunks: list[ChunkCreate] = Field(
-        default_factory=list, description="Initial chunks for the document"
-    )
     metadata: DocumentMetadata = Field(
         default_factory=DocumentMetadata, description="Associated metadata"
     )

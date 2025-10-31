@@ -34,7 +34,7 @@ class ChunkService:
         library_repo = get_library_repository()
 
         # Verify document exists
-        document = document_repo.get(document_id)
+        document = await document_repo.get(document_id)
 
         # Create the chunk
         chunk = Chunk(
@@ -44,13 +44,20 @@ class ChunkService:
             metadata=chunk_create.metadata,
         )
 
-        # Save chunk
-        chunk = chunk_repo.create(chunk)
+        # Get the library to determine vector index
+        library = library_repo.get(document.library_id)
 
-        # Add chunk to document
-        document.chunks.append(chunk)
+        # Determine the next vector index for this library
+        # For now, use a simple approach - count existing chunks
+        # TODO: This could be optimized with a separate counter
+        vector_index = 0  # Will be set by the repository
+
+        # Save chunk with vector index
+        chunk = await chunk_repo.create(chunk, vector_index)
+
+        # Update document timestamp
         document.updated_at = datetime.utcnow()
-        document_repo.update(document_id, document)
+        await document_repo.update(document_id, document)
 
         # Add to index
         try:
@@ -61,7 +68,7 @@ class ChunkService:
 
         return chunk
 
-    def get_chunk(self, chunk_id: UUID) -> Chunk:
+    async def get_chunk(self, chunk_id: UUID) -> Chunk:
         """
         Get a chunk by ID.
 
@@ -75,9 +82,9 @@ class ChunkService:
             NotFoundException: If chunk not found
         """
         chunk_repo = get_chunk_repository()
-        return chunk_repo.get(chunk_id)
+        return await chunk_repo.get(chunk_id)
 
-    def get_all_chunks(self, document_id: UUID) -> list[Chunk]:
+    async def get_all_chunks(self, document_id: UUID) -> list[Chunk]:
         """
         Get all chunks in a document.
 
@@ -91,10 +98,15 @@ class ChunkService:
             NotFoundException: If document not found
         """
         document_repo = get_document_repository()
-        document = document_repo.get(document_id)
-        return document.chunks
+        chunk_repo = get_chunk_repository()
 
-    def get_chunks_paginated(
+        # Verify document exists
+        await document_repo.get(document_id)
+
+        # Get chunks from repository
+        return await chunk_repo.get_by_document(document_id)
+
+    async def get_chunks_paginated(
         self,
         document_id: UUID,
         skip: int = 0,
@@ -120,7 +132,7 @@ class ChunkService:
         chunk_repo = get_chunk_repository()
 
         # Verify document exists
-        document_repo.get(document_id)
+        await document_repo.get(document_id)
 
         def filter_fn(chunk: Chunk) -> bool:
             if chunk.document_id != document_id:
@@ -141,7 +153,7 @@ class ChunkService:
             has_more=skip + len(items) < total,
         )
 
-    def update_chunk(self, chunk_id: UUID, chunk_update: ChunkUpdate) -> Chunk:
+    async def update_chunk(self, chunk_id: UUID, chunk_update: ChunkUpdate) -> Chunk:
         """
         Update a chunk.
 
@@ -156,7 +168,7 @@ class ChunkService:
             NotFoundException: If chunk not found
         """
         chunk_repo = get_chunk_repository()
-        chunk = chunk_repo.get(chunk_id)
+        chunk = await chunk_repo.get(chunk_id)
 
         if chunk_update.text is not None:
             chunk.text = chunk_update.text
@@ -166,7 +178,7 @@ class ChunkService:
             chunk.metadata = chunk_update.metadata
 
         chunk.updated_at = datetime.utcnow()
-        return chunk_repo.update(chunk_id, chunk)
+        return await chunk_repo.update(chunk_id, chunk)
 
     async def delete_chunk(self, chunk_id: UUID) -> None:
         """
@@ -182,13 +194,12 @@ class ChunkService:
         document_repo = get_document_repository()
         library_repo = get_library_repository()
 
-        chunk = chunk_repo.get(chunk_id)
+        chunk = await chunk_repo.get(chunk_id)
 
-        # Remove chunk from document
-        document = document_repo.get(chunk.document_id)
-        document.chunks = [c for c in document.chunks if c.id != chunk_id]
+        # Update document timestamp
+        document = await document_repo.get(chunk.document_id)
         document.updated_at = datetime.utcnow()
-        document_repo.update(document.id, document)
+        await document_repo.update(document.id, document)
 
         # Remove from index
         try:
@@ -198,7 +209,7 @@ class ChunkService:
             pass
 
         # Delete the chunk
-        chunk_repo.delete(chunk_id)
+        await chunk_repo.delete(chunk_id)
 
 
 # Singleton instance

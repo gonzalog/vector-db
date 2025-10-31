@@ -34,7 +34,6 @@ class LibraryService:
             name=library_create.name,
             metadata=library_create.metadata,
             index_config=library_create.index_config,
-            documents=[],
         )
         # Repository handles index creation
         library_repo = get_library_repository()
@@ -136,16 +135,17 @@ class LibraryService:
         library = library_repo.get(library_id)
 
         # Delete all documents in the library
-        for document in library.documents:
+        documents, _ = await document_repo.get_paginated_by_library(library_id, 0, 10000)
+        for document in documents:
             try:
-                document_repo.delete(document.id)
+                await document_repo.delete(document.id)
             except NotFoundException:
                 pass
 
         # Repository handles index deletion
         await library_repo.delete(library_id)
 
-    def get_documents(self, library_id: UUID) -> list[Document]:
+    async def get_documents(self, library_id: UUID) -> list[Document]:
         """
         Get all documents in a library.
 
@@ -159,8 +159,14 @@ class LibraryService:
             NotFoundException: If library not found
         """
         library_repo = get_library_repository()
-        library = library_repo.get(library_id)
-        return library.documents
+        document_repo = get_document_repository()
+
+        # Verify library exists
+        library_repo.get(library_id)
+
+        # Get documents from repository
+        documents, _ = await document_repo.get_paginated_by_library(library_id, 0, 10000)
+        return documents
 
 
 # Singleton instance

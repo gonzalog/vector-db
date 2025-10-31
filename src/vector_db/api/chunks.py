@@ -17,21 +17,21 @@ async def create_chunk(document_id: UUID, chunk_create: ChunkCreate) -> Chunk:
 
 
 @router.get("/{chunk_id}", response_model=Chunk, status_code=status.HTTP_200_OK)
-def get_chunk(chunk_id: UUID) -> Chunk:
+async def get_chunk(chunk_id: UUID) -> Chunk:
     """Get a chunk by ID."""
-    return chunk_service.get_chunk(chunk_id)
+    return await chunk_service.get_chunk(chunk_id)
 
 
 @router.get("", response_model=list[Chunk], status_code=status.HTTP_200_OK)
-def get_all_chunks(document_id: UUID) -> list[Chunk]:
+async def get_all_chunks(document_id: UUID) -> list[Chunk]:
     """Get all chunks in a document."""
-    return chunk_service.get_all_chunks(document_id)
+    return await chunk_service.get_all_chunks(document_id)
 
 
 @router.put("/{chunk_id}", response_model=Chunk, status_code=status.HTTP_200_OK)
-def update_chunk(chunk_id: UUID, chunk_update: ChunkUpdate) -> Chunk:
+async def update_chunk(chunk_id: UUID, chunk_update: ChunkUpdate) -> Chunk:
     """Update a chunk."""
-    return chunk_service.update_chunk(chunk_id, chunk_update)
+    return await chunk_service.update_chunk(chunk_id, chunk_update)
 
 
 @router.delete("/{chunk_id}", status_code=status.HTTP_204_NO_CONTENT)
