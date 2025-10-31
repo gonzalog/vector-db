@@ -11,17 +11,17 @@ from vector_db.models import (
     DocumentUpdate,
     PaginatedResponse,
 )
-from vector_db.repositories.memory_repository import (
-    chunk_repository,
-    document_repository,
-    library_repository,
+from vector_db.repositories.registry import (
+    get_chunk_repository,
+    get_document_repository,
+    get_library_repository,
 )
 
 
 class DocumentService:
     """Service for managing documents."""
 
-    def create_document(self, library_id: UUID, document_create: DocumentCreate) -> Document:
+    async def create_document(self, library_id: UUID, document_create: DocumentCreate) -> Document:
         """
         Create a new document in a library.
 
@@ -35,8 +35,12 @@ class DocumentService:
         Raises:
             NotFoundException: If library not found
         """
+        library_repo = get_library_repository()
+        document_repo = get_document_repository()
+        chunk_repo = get_chunk_repository()
+
         # Verify library exists
-        library = library_repository.get(library_id)
+        library = library_repo.get(library_id)
 
         # Create the document
         document = Document(
@@ -54,16 +58,16 @@ class DocumentService:
                 embedding=chunk_create.embedding,
                 metadata=chunk_create.metadata,
             )
-            chunk = chunk_repository.create(chunk)
+            chunk = chunk_repo.create(chunk)
             document.chunks.append(chunk)
 
         # Save document
-        document = document_repository.create(document)
+        document = document_repo.create(document)
 
         # Add document to library
         library.documents.append(document)
         library.updated_at = datetime.utcnow()
-        library_repository.update(library_id, library)
+        await library_repo.update(library_id, library)
 
         return document
 
@@ -80,7 +84,8 @@ class DocumentService:
         Raises:
             NotFoundException: If document not found
         """
-        return document_repository.get(document_id)
+        document_repo = get_document_repository()
+        return document_repo.get(document_id)
 
     def get_all_documents(self, library_id: UUID) -> list[Document]:
         """
@@ -95,7 +100,8 @@ class DocumentService:
         Raises:
             NotFoundException: If library not found
         """
-        library = library_repository.get(library_id)
+        library_repo = get_library_repository()
+        library = library_repo.get(library_id)
         return library.documents
 
     def get_documents_paginated(
@@ -118,13 +124,16 @@ class DocumentService:
         Raises:
             NotFoundException: If library not found
         """
+        library_repo = get_library_repository()
+        document_repo = get_document_repository()
+
         # Verify library exists
-        library_repository.get(library_id)
+        library_repo.get(library_id)
 
         def filter_fn(document: Document) -> bool:
             return document.library_id == library_id
 
-        items, total = document_repository.get_paginated(
+        items, total = document_repo.get_paginated(
             skip=skip, limit=limit, filter_fn=filter_fn
         )
 
@@ -152,7 +161,8 @@ class DocumentService:
         Raises:
             NotFoundException: If document not found
         """
-        document = document_repository.get(document_id)
+        document_repo = get_document_repository()
+        document = document_repo.get(document_id)
 
         if document_update.name is not None:
             document.name = document_update.name
@@ -160,9 +170,9 @@ class DocumentService:
             document.metadata = document_update.metadata
 
         document.updated_at = datetime.utcnow()
-        return document_repository.update(document_id, document)
+        return document_repo.update(document_id, document)
 
-    def delete_document(self, document_id: UUID) -> None:
+    async def delete_document(self, document_id: UUID) -> None:
         """
         Delete a document and all its chunks.
 
@@ -172,23 +182,27 @@ class DocumentService:
         Raises:
             NotFoundException: If document not found
         """
-        document = document_repository.get(document_id)
+        library_repo = get_library_repository()
+        document_repo = get_document_repository()
+        chunk_repo = get_chunk_repository()
+
+        document = document_repo.get(document_id)
 
         # Delete all chunks in the document
         for chunk in document.chunks:
             try:
-                chunk_repository.delete(chunk.id)
+                chunk_repo.delete(chunk.id)
             except NotFoundException:
                 pass
 
         # Remove document from library
-        library = library_repository.get(document.library_id)
+        library = library_repo.get(document.library_id)
         library.documents = [d for d in library.documents if d.id != document_id]
         library.updated_at = datetime.utcnow()
-        library_repository.update(library.id, library)
+        await library_repo.update(library.id, library)
 
         # Delete the document
-        document_repository.delete(document_id)
+        document_repo.delete(document_id)
 
     def get_chunks(self, document_id: UUID) -> list[Chunk]:
         """
@@ -203,7 +217,8 @@ class DocumentService:
         Raises:
             NotFoundException: If document not found
         """
-        document = document_repository.get(document_id)
+        document_repo = get_document_repository()
+        document = document_repo.get(document_id)
         return document.chunks
 
 

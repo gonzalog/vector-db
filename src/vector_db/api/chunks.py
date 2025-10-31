@@ -11,9 +11,9 @@ router = APIRouter(prefix="/chunks", tags=["chunks"])
 
 
 @router.post("", response_model=Chunk, status_code=status.HTTP_201_CREATED)
-def create_chunk(document_id: UUID, chunk_create: ChunkCreate) -> Chunk:
+async def create_chunk(document_id: UUID, chunk_create: ChunkCreate) -> Chunk:
     """Create a new chunk in a document."""
-    return chunk_service.create_chunk(document_id, chunk_create)
+    return await chunk_service.create_chunk(document_id, chunk_create)
 
 
 @router.get("/{chunk_id}", response_model=Chunk, status_code=status.HTTP_200_OK)
@@ -35,6 +35,6 @@ def update_chunk(chunk_id: UUID, chunk_update: ChunkUpdate) -> Chunk:
 
 
 @router.delete("/{chunk_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_chunk(chunk_id: UUID) -> None:
+async def delete_chunk(chunk_id: UUID) -> None:
     """Delete a chunk."""
-    chunk_service.delete_chunk(chunk_id)
+    await chunk_service.delete_chunk(chunk_id)

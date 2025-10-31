@@ -5,17 +5,17 @@ from uuid import UUID
 
 from vector_db.core.exceptions import NotFoundException
 from vector_db.models import Chunk, ChunkCreate, ChunkUpdate, PaginatedResponse
-from vector_db.repositories.memory_repository import (
-    chunk_repository,
-    document_repository,
-    library_repository,
+from vector_db.repositories.registry import (
+    get_chunk_repository,
+    get_document_repository,
+    get_library_repository,
 )
 
 
 class ChunkService:
     """Service for managing chunks."""
 
-    def create_chunk(self, document_id: UUID, chunk_create: ChunkCreate) -> Chunk:
+    async def create_chunk(self, document_id: UUID, chunk_create: ChunkCreate) -> Chunk:
         """
         Create a new chunk in a document.
 
@@ -29,8 +29,12 @@ class ChunkService:
         Raises:
             NotFoundException: If document not found
         """
+        document_repo = get_document_repository()
+        chunk_repo = get_chunk_repository()
+        library_repo = get_library_repository()
+
         # Verify document exists
-        document = document_repository.get(document_id)
+        document = document_repo.get(document_id)
 
         # Create the chunk
         chunk = Chunk(
@@ -41,16 +45,16 @@ class ChunkService:
         )
 
         # Save chunk
-        chunk = chunk_repository.create(chunk)
+        chunk = chunk_repo.create(chunk)
 
         # Add chunk to document
         document.chunks.append(chunk)
         document.updated_at = datetime.utcnow()
-        document_repository.update(document_id, document)
+        document_repo.update(document_id, document)
 
         # Add to index
         try:
-            library_repository.add_chunk_to_index(document.library_id, chunk)
+            await library_repo.add_chunk_to_index(document.library_id, chunk)
         except Exception:
             # Index errors shouldn't fail chunk creation
             pass
@@ -70,7 +74,8 @@ class ChunkService:
         Raises:
             NotFoundException: If chunk not found
         """
-        return chunk_repository.get(chunk_id)
+        chunk_repo = get_chunk_repository()
+        return chunk_repo.get(chunk_id)
 
     def get_all_chunks(self, document_id: UUID) -> list[Chunk]:
         """
@@ -85,7 +90,8 @@ class ChunkService:
         Raises:
             NotFoundException: If document not found
         """
-        document = document_repository.get(document_id)
+        document_repo = get_document_repository()
+        document = document_repo.get(document_id)
         return document.chunks
 
     def get_chunks_paginated(
@@ -110,8 +116,11 @@ class ChunkService:
         Raises:
             NotFoundException: If document not found
         """
+        document_repo = get_document_repository()
+        chunk_repo = get_chunk_repository()
+
         # Verify document exists
-        document_repository.get(document_id)
+        document_repo.get(document_id)
 
         def filter_fn(chunk: Chunk) -> bool:
             if chunk.document_id != document_id:
@@ -120,7 +129,7 @@ class ChunkService:
                 return True
             return search.lower() in chunk.text.lower()
 
-        items, total = chunk_repository.get_paginated(
+        items, total = chunk_repo.get_paginated(
             skip=skip, limit=limit, filter_fn=filter_fn
         )
 
@@ -146,7 +155,8 @@ class ChunkService:
         Raises:
             NotFoundException: If chunk not found
         """
-        chunk = chunk_repository.get(chunk_id)
+        chunk_repo = get_chunk_repository()
+        chunk = chunk_repo.get(chunk_id)
 
         if chunk_update.text is not None:
             chunk.text = chunk_update.text
@@ -156,9 +166,9 @@ class ChunkService:
             chunk.metadata = chunk_update.metadata
 
         chunk.updated_at = datetime.utcnow()
-        return chunk_repository.update(chunk_id, chunk)
+        return chunk_repo.update(chunk_id, chunk)
 
-    def delete_chunk(self, chunk_id: UUID) -> None:
+    async def delete_chunk(self, chunk_id: UUID) -> None:
         """
         Delete a chunk.
 
@@ -168,23 +178,27 @@ class ChunkService:
         Raises:
             NotFoundException: If chunk not found
         """
-        chunk = chunk_repository.get(chunk_id)
+        chunk_repo = get_chunk_repository()
+        document_repo = get_document_repository()
+        library_repo = get_library_repository()
+
+        chunk = chunk_repo.get(chunk_id)
 
         # Remove chunk from document
-        document = document_repository.get(chunk.document_id)
+        document = document_repo.get(chunk.document_id)
         document.chunks = [c for c in document.chunks if c.id != chunk_id]
         document.updated_at = datetime.utcnow()
-        document_repository.update(document.id, document)
+        document_repo.update(document.id, document)
 
         # Remove from index
         try:
-            library_repository.remove_chunk_from_index(document.library_id, chunk_id)
+            await library_repo.remove_chunk_from_index(document.library_id, chunk_id)
         except Exception:
             # Index errors shouldn't fail chunk deletion
             pass
 
         # Delete the chunk
-        chunk_repository.delete(chunk_id)
+        chunk_repo.delete(chunk_id)
 
 
 # Singleton instance

@@ -18,9 +18,9 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 
 
 @router.post("", response_model=Document, status_code=status.HTTP_201_CREATED)
-def create_document(library_id: UUID, document_create: DocumentCreate) -> Document:
+async def create_document(library_id: UUID, document_create: DocumentCreate) -> Document:
     """Create a new document in a library."""
-    return document_service.create_document(library_id, document_create)
+    return await document_service.create_document(library_id, document_create)
 
 
 @router.get("/{document_id}", response_model=Document, status_code=status.HTTP_200_OK)
@@ -52,9 +52,9 @@ def update_document(document_id: UUID, document_update: DocumentUpdate) -> Docum
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_document(document_id: UUID) -> None:
+async def delete_document(document_id: UUID) -> None:
     """Delete a document."""
-    document_service.delete_document(document_id)
+    await document_service.delete_document(document_id)
 
 
 @router.get(
