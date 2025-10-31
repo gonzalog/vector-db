@@ -16,7 +16,7 @@ from vector_db.core.persistence.repositories import (
 )
 from vector_db.core.persistence.vector_storage import VectorStorage
 from vector_db.core.persistence.index_storage import IndexStorage
-from vector_db.core.settings import settings
+from vector_db.core.settings import Settings, settings as default_settings
 from vector_db.indexes import DistanceMetric, FlatIndex, HNSWIndex, LSHIndex, VectorIndex
 from vector_db.models import Chunk, Document, Library, SearchResponse, SearchResult, VectorQuery
 
@@ -36,8 +36,11 @@ class PersistentLibraryRepository:
     Combines SQLite (metadata), NumPy (.npy for vectors), and Pickle (.pkl for indexes).
     """
 
-    def __init__(self):
+    def __init__(self, settings: Settings | None = None):
         """Initialize the persistent library repository."""
+        if settings is None:
+            settings = default_settings
+
         # Storage managers
         self.vector_storage = VectorStorage(settings.VECTORS_DIR)
         self.index_storage = IndexStorage(settings.INDEXES_DIR)
