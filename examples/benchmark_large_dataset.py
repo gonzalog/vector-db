@@ -1,8 +1,8 @@
 """
 Benchmark different index types with the IMDB movie reviews dataset.
 
-This demonstrates how indexes scale with real-world data, using 50,000
-movie reviews from the Stanford IMDB dataset.
+This demonstrates how indexes scale with real-world data, focusing on
+performance and sentiment accuracy with 1,000 balanced movie reviews.
 
 Requirements:
     uv add cohere requests python-dotenv datasets
@@ -195,13 +195,6 @@ def search(library_id: str, query_embedding: list[float], k: int = 10) -> tuple[
     return response.json()["results"], query_time
 
 
-def calculate_recall(results: list[dict], ground_truth_indices: set[int], k: int = 10) -> float:
-    """Calculate recall by comparing result indices against ground truth."""
-    result_indices = {r["chunk"]["metadata"]["index"] for r in results[:k]}
-    matching = len(result_indices & ground_truth_indices)
-    return matching / k
-
-
 def calculate_sentiment_accuracy(results: list[dict], expected_label: int, k: int = 10) -> float:
     """
     Calculate sentiment accuracy - how many results match the expected sentiment.
@@ -255,23 +248,6 @@ def run_benchmark():
     print(f"✓ Generated {len(query_embeddings)} query embeddings")
     print()
 
-    # Step 3: Compute ground truth
-    print("Step 3: Computing ground truth (Flat-Cosine)...")
-    ground_truth_lib_id = create_library("Ground Truth", {
-        "index_type": "flat",
-        "distance_metric": "cosine"
-    })
-    add_documents(ground_truth_lib_id, texts, text_embeddings, labels)
-
-    ground_truth_results = []
-    for query_embedding in query_embeddings:
-        results, _ = search(ground_truth_lib_id, query_embedding, k=10)
-        ground_truth_indices = {r["chunk"]["metadata"]["index"] for r in results}
-        ground_truth_results.append(ground_truth_indices)
-
-    print(f"✓ Computed ground truth")
-    print()
-
     # Configurations to test
     configurations = [
         {"index_type": "flat", "distance_metric": "cosine"},
@@ -306,7 +282,6 @@ def run_benchmark():
         print(f"✓ Added {len(texts)} texts")
 
         # Run queries
-        total_recall = 0.0
         total_sentiment_accuracy = 0.0
         total_query_time = 0.0
         query_times = []
@@ -316,33 +291,25 @@ def run_benchmark():
             query_times.append(query_time)
             total_query_time += query_time
 
-            # Calculate recall against ground truth (Flat index)
-            ground_truth_indices = ground_truth_results[i]
-            recall = calculate_recall(search_results, ground_truth_indices, k=10)
-            total_recall += recall
-
             # Calculate sentiment accuracy
             expected_label = expected_labels[i]
             sentiment_acc = calculate_sentiment_accuracy(search_results, expected_label, k=10)
             total_sentiment_accuracy += sentiment_acc
 
             sentiment_name = "positive" if expected_label == 1 else "negative"
-            print(f"  Query {i+1} ({sentiment_name}): Recall@10={recall:.0%}, Sentiment={sentiment_acc:.0%}, Time={query_time*1000:.2f}ms")
+            print(f"  Query {i+1} ({sentiment_name}): Sentiment={sentiment_acc:.0%}, Time={query_time*1000:.2f}ms")
 
-        avg_recall = total_recall / len(query_embeddings)
         avg_sentiment_accuracy = total_sentiment_accuracy / len(query_embeddings)
         avg_query_time = total_query_time / len(query_embeddings)
 
         results.append({
             "config": config_name,
-            "avg_recall": avg_recall,
             "avg_sentiment_accuracy": avg_sentiment_accuracy,
             "avg_query_time_ms": avg_query_time * 1000,
             "min_query_time_ms": min(query_times) * 1000,
             "max_query_time_ms": max(query_times) * 1000,
         })
 
-        print(f"✓ Average Recall@10: {avg_recall:.2%}")
         print(f"✓ Average Sentiment Accuracy: {avg_sentiment_accuracy:.2%}")
         print(f"✓ Average Query Time: {avg_query_time*1000:.2f}ms")
         print()
@@ -353,23 +320,23 @@ def run_benchmark():
     print("=" * 80)
     print()
 
-    results_by_recall = sorted(results, key=lambda x: (-x["avg_recall"], x["avg_query_time_ms"]))
-    results_by_speed = sorted(results, key=lambda x: (x["avg_query_time_ms"], -x["avg_recall"]))
+    results_by_sentiment = sorted(results, key=lambda x: (-x["avg_sentiment_accuracy"], x["avg_query_time_ms"]))
+    results_by_speed = sorted(results, key=lambda x: (x["avg_query_time_ms"], -x["avg_sentiment_accuracy"]))
 
-    print("Ranked by Recall:")
-    print("-" * 95)
-    print(f"{'Rank':<6} {'Configuration':<45} {'Recall':<10} {'Sentiment':<12} {'Time':<12}")
-    print("-" * 95)
-    for i, result in enumerate(results_by_recall, 1):
-        print(f"{i:<6} {result['config']:<45} {result['avg_recall']:.1%}{'':5} {result['avg_sentiment_accuracy']:.1%}{'':7} {result['avg_query_time_ms']:.2f}ms")
+    print("Ranked by Sentiment Accuracy:")
+    print("-" * 85)
+    print(f"{'Rank':<6} {'Configuration':<45} {'Sentiment':<15} {'Avg Time':<12}")
+    print("-" * 85)
+    for i, result in enumerate(results_by_sentiment, 1):
+        print(f"{i:<6} {result['config']:<45} {result['avg_sentiment_accuracy']:.1%}{'':10} {result['avg_query_time_ms']:.2f}ms")
     print()
 
     print("Ranked by Speed:")
-    print("-" * 95)
-    print(f"{'Rank':<6} {'Configuration':<45} {'Time':<12} {'Recall':<10} {'Sentiment':<12}")
-    print("-" * 95)
+    print("-" * 85)
+    print(f"{'Rank':<6} {'Configuration':<45} {'Avg Time':<15} {'Sentiment':<12}")
+    print("-" * 85)
     for i, result in enumerate(results_by_speed, 1):
-        print(f"{i:<6} {result['config']:<45} {result['avg_query_time_ms']:.2f}ms{'':4} {result['avg_recall']:.1%}{'':5} {result['avg_sentiment_accuracy']:.1%}")
+        print(f"{i:<6} {result['config']:<45} {result['avg_query_time_ms']:.2f}ms{'':7} {result['avg_sentiment_accuracy']:.1%}")
     print()
 
     print("=" * 80)
@@ -378,28 +345,27 @@ def run_benchmark():
     print()
     print(f"Dataset: IMDB Movie Reviews")
     print(f"Size: {len(texts):,} vectors (reviews)")
+    print(f"Distribution: {len(texts)//2:,} negative + {len(texts)//2:,} positive (balanced)")
     print(f"Queries: {len(query_texts)} sentiment-labeled queries")
     print()
     print("Metrics:")
-    print("  • Recall: How many ground-truth results were found")
     print("  • Sentiment Accuracy: How many results match the query sentiment")
+    print("  • Query Time: Average time to perform a search")
     print()
     print("Performance at this scale:")
-    print("  • Flat index: Perfect recall, O(n) time complexity")
-    print("  • HNSW: Near-perfect recall, sublinear search time")
-    print("  • LSH: Fast approximate search, recall depends on parameters")
+    print("  • Flat index: Exact search, O(n) time complexity")
+    print("  • HNSW: Approximate search, sublinear time, excellent accuracy")
+    print("  • LSH: Fast approximate search, accuracy depends on parameters")
     print()
 
-    best_recall = results_by_recall[0]
+    best_sentiment = results_by_sentiment[0]
     fastest = results_by_speed[0]
-    print(f"🏆 Best Recall: {best_recall['config']}")
-    print(f"   Recall@10: {best_recall['avg_recall']:.1%}")
-    print(f"   Sentiment Accuracy: {best_recall['avg_sentiment_accuracy']:.1%}")
-    print(f"   Time: {best_recall['avg_query_time_ms']:.2f}ms")
+    print(f"🎯 Best Sentiment Accuracy: {best_sentiment['config']}")
+    print(f"   Sentiment Accuracy: {best_sentiment['avg_sentiment_accuracy']:.1%}")
+    print(f"   Avg Time: {best_sentiment['avg_query_time_ms']:.2f}ms")
     print()
     print(f"⚡ Fastest: {fastest['config']}")
-    print(f"   Time: {fastest['avg_query_time_ms']:.2f}ms")
-    print(f"   Recall@10: {fastest['avg_recall']:.1%}")
+    print(f"   Avg Time: {fastest['avg_query_time_ms']:.2f}ms")
     print(f"   Sentiment Accuracy: {fastest['avg_sentiment_accuracy']:.1%}")
     print()
 
