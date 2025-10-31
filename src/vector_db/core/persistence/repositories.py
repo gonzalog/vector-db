@@ -361,6 +361,14 @@ class ChunkRepository:
             row = await cursor.fetchone()
         return row["count"] if row else 0
 
+    async def update_vector_index(self, chunk_id: str, vector_index: int) -> None:
+        """Update the vector_index for a chunk."""
+        await self.db.conn.execute(
+            "UPDATE chunks SET vector_index = ? WHERE id = ?",
+            (vector_index, chunk_id),
+        )
+        await self.db.conn.commit()
+
     async def delete(self, chunk_id: str) -> None:
         """Delete a chunk."""
         await self.db.conn.execute(

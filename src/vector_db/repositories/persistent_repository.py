@@ -286,6 +286,11 @@ class PersistentLibraryRepository:
             self._vectors[library_id] = new_vectors
             self._chunk_vector_indices[chunk.id] = vector_index
 
+            # Update vector_index in database
+            db = get_database()
+            chunk_repo = ChunkRepository(db)
+            await chunk_repo.update_vector_index(str(chunk.id), vector_index)
+
             # Add to index
             index.add(chunk)
 
