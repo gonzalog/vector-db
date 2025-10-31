@@ -8,6 +8,7 @@ from vector_db.models import Chunk, ChunkCreate, ChunkUpdate, PaginatedResponse
 from vector_db.repositories.memory_repository import (
     chunk_repository,
     document_repository,
+    library_repository,
 )
 
 
@@ -46,6 +47,13 @@ class ChunkService:
         document.chunks.append(chunk)
         document.updated_at = datetime.utcnow()
         document_repository.update(document_id, document)
+
+        # Add to index
+        try:
+            library_repository.add_chunk_to_index(document.library_id, chunk)
+        except Exception:
+            # Index errors shouldn't fail chunk creation
+            pass
 
         return chunk
 
@@ -167,6 +175,13 @@ class ChunkService:
         document.chunks = [c for c in document.chunks if c.id != chunk_id]
         document.updated_at = datetime.utcnow()
         document_repository.update(document.id, document)
+
+        # Remove from index
+        try:
+            library_repository.remove_chunk_from_index(document.library_id, chunk_id)
+        except Exception:
+            # Index errors shouldn't fail chunk deletion
+            pass
 
         # Delete the chunk
         chunk_repository.delete(chunk_id)

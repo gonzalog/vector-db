@@ -9,5 +9,9 @@ wheels/
 # Virtual environments
 .venv
 
+# Environment variables
+.env
+.env.local
+
 # Claude Code
 .claude/

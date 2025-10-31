@@ -1,6 +1,7 @@
 """Tests for API endpoints."""
 
 import pytest
+from fastapi import status
 from fastapi.testclient import TestClient
 
 from vector_db.main import app
@@ -34,7 +35,7 @@ class TestLibraryEndpoints:
             "/api/v1/libraries",
             json={"name": "Test Library", "metadata": {"description": "Test"}},
         )
-        assert response.status_code == 201
+        assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert data["name"] == "Test Library"
         assert data["metadata"]["description"] == "Test"
@@ -53,7 +54,7 @@ class TestLibraryEndpoints:
         )
 
         response = client.get("/api/v1/libraries")
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert "items" in data
         assert len(data["items"]) == 2
@@ -68,7 +69,7 @@ class TestLibraryEndpoints:
         library_id = create_response.json()["id"]
 
         response = client.get(f"/api/v1/libraries/{library_id}")
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["id"] == library_id
         assert data["name"] == "Test Library"
@@ -78,7 +79,7 @@ class TestLibraryEndpoints:
         response = client.get(
             "/api/v1/libraries/00000000-0000-0000-0000-000000000000"
         )
-        assert response.status_code == 404
+        assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_update_library(self):
         """Test updating a library."""
@@ -92,7 +93,7 @@ class TestLibraryEndpoints:
             f"/api/v1/libraries/{library_id}",
             json={"name": "New Name"},
         )
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["name"] == "New Name"
 
@@ -105,11 +106,11 @@ class TestLibraryEndpoints:
         library_id = create_response.json()["id"]
 
         response = client.delete(f"/api/v1/libraries/{library_id}")
-        assert response.status_code == 204
+        assert response.status_code == status.HTTP_204_NO_CONTENT
 
         # Verify it's deleted
         get_response = client.get(f"/api/v1/libraries/{library_id}")
-        assert get_response.status_code == 404
+        assert get_response.status_code == status.HTTP_404_NOT_FOUND
 
 
 class TestDocumentEndpoints:
@@ -128,7 +129,7 @@ class TestDocumentEndpoints:
             f"/api/v1/documents?library_id={library_id}",
             json={"name": "Test Document", "metadata": {"title": "Test"}},
         )
-        assert response.status_code == 201
+        assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert data["name"] == "Test Document"
         assert data["library_id"] == library_id
@@ -149,7 +150,7 @@ class TestDocumentEndpoints:
         document_id = create_response.json()["id"]
 
         response = client.get(f"/api/v1/documents/{document_id}")
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["id"] == document_id
 
@@ -172,7 +173,7 @@ class TestDocumentEndpoints:
             f"/api/v1/documents/{document_id}",
             json={"name": "New Name"},
         )
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["name"] == "New Name"
 
@@ -192,7 +193,7 @@ class TestDocumentEndpoints:
         document_id = create_response.json()["id"]
 
         response = client.delete(f"/api/v1/documents/{document_id}")
-        assert response.status_code == 204
+        assert response.status_code == status.HTTP_204_NO_CONTENT
 
 
 class TestChunkEndpoints:
@@ -220,7 +221,7 @@ class TestChunkEndpoints:
                 "embedding": [0.1, 0.2, 0.3],
             },
         )
-        assert response.status_code == 201
+        assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
         assert data["text"] == "Test chunk text"
         assert data["document_id"] == document_id
@@ -247,7 +248,7 @@ class TestChunkEndpoints:
         chunk_id = create_response.json()["id"]
 
         response = client.get(f"/api/v1/chunks/{chunk_id}")
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["id"] == chunk_id
 
@@ -276,7 +277,7 @@ class TestChunkEndpoints:
             f"/api/v1/chunks/{chunk_id}",
             json={"text": "New text"},
         )
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["text"] == "New text"
 
@@ -302,4 +303,4 @@ class TestChunkEndpoints:
         chunk_id = create_response.json()["id"]
 
         response = client.delete(f"/api/v1/chunks/{chunk_id}")
-        assert response.status_code == 204
+        assert response.status_code == status.HTTP_204_NO_CONTENT

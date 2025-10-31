@@ -33,9 +33,12 @@ class LibraryService:
         library = Library(
             name=library_create.name,
             metadata=library_create.metadata,
+            index_config=library_create.index_config,
             documents=[],
         )
-        return library_repository.create(library)
+        # Repository handles index creation
+        library = library_repository.create(library)
+        return library
 
     def get_library(self, library_id: UUID) -> Library:
         """
@@ -131,6 +134,7 @@ class LibraryService:
             except NotFoundException:
                 pass
 
+        # Repository handles index deletion
         library_repository.delete(library_id)
 
     def get_documents(self, library_id: UUID) -> list[Document]:

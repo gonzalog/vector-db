@@ -11,7 +11,10 @@ from vector_db.models import (
     LibraryCreate,
     LibraryUpdate,
     PaginatedResponse,
+    SearchResponse,
+    VectorQuery,
 )
+from vector_db.repositories.memory_repository import library_repository
 from vector_db.services.library_service import library_service
 
 router = APIRouter(prefix="/libraries", tags=["libraries"])
@@ -62,3 +65,13 @@ def delete_library(library_id: UUID) -> None:
 def get_library_documents(library_id: UUID) -> list[Document]:
     """Get all documents in a library."""
     return library_service.get_documents(library_id)
+
+
+@router.post(
+    "/{library_id}/search",
+    response_model=SearchResponse,
+    status_code=status.HTTP_200_OK,
+)
+def search_library(library_id: UUID, query: VectorQuery) -> SearchResponse:
+    """Search for similar vectors in a library."""
+    return library_repository.search(library_id, query)

@@ -1,6 +1,7 @@
 """Tests for pagination."""
 
 import pytest
+from fastapi import status
 from fastapi.testclient import TestClient
 
 from vector_db.main import app
@@ -39,7 +40,7 @@ class TestLibraryPagination:
 
         # Get with defaults (skip=0, limit=50)
         response = client.get("/api/v1/libraries")
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data["items"]) == 3
         assert data["total"] == 3
@@ -58,7 +59,7 @@ class TestLibraryPagination:
 
         # Get first page
         response = client.get("/api/v1/libraries?skip=0&limit=2")
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data["items"]) == 2
         assert data["total"] == 5
@@ -68,7 +69,7 @@ class TestLibraryPagination:
 
         # Get second page
         response = client.get("/api/v1/libraries?skip=2&limit=2")
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data["items"]) == 2
         assert data["total"] == 5
@@ -77,7 +78,7 @@ class TestLibraryPagination:
 
         # Get last page
         response = client.get("/api/v1/libraries?skip=4&limit=2")
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data["items"]) == 1
         assert data["total"] == 5
@@ -108,7 +109,7 @@ class TestDocumentPagination:
         response = client.get(
             f"/api/v1/documents?library_id={library_id}&skip=0&limit=2"
         )
-        assert response.status_code == 200
+        assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data["items"]) == 2
         assert data["total"] == 5

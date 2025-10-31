@@ -19,6 +19,32 @@ class ChunkMetadata(BaseModel):
         default_factory=dict, description="Custom metadata fields"
     )
 
+    model_config = ConfigDict(extra="allow")
+
+    def model_post_init(self, __context: Any) -> None:
+        """Move extra fields to custom dict after initialization."""
+        # Get all extra fields that were passed but aren't defined fields
+        defined_fields = {
+            "source",
+            "page_number",
+            "position",
+            "author",
+            "tags",
+            "custom",
+        }
+
+        # Collect extra fields
+        extra_fields = {}
+        for key in list(self.__dict__.keys()):
+            if key not in defined_fields:
+                extra_fields[key] = self.__dict__.pop(key)
+
+        # Add them to custom dict
+        if extra_fields:
+            if self.custom is None:
+                self.custom = {}
+            self.custom.update(extra_fields)
+
 
 class Chunk(BaseModel):
     """A chunk represents a piece of text with its embedding and metadata."""

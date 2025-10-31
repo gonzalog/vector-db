@@ -8,6 +8,7 @@ from vector_db.models.document import (
     DocumentUpdate,
 )
 from vector_db.models.library import (
+    IndexConfig,
     Library,
     LibraryCreate,
     LibraryMetadata,
@@ -35,6 +36,7 @@ __all__ = [
     "LibraryCreate",
     "LibraryUpdate",
     "LibraryMetadata",
+    "IndexConfig",
     # Query models
     "VectorQuery",
     "SearchResult",

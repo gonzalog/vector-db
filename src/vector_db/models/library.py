@@ -9,6 +9,32 @@ from pydantic import BaseModel, ConfigDict, Field
 from vector_db.models.document import Document, DocumentCreate
 
 
+class IndexConfig(BaseModel):
+    """Configuration for vector index."""
+
+    index_type: str = Field(default="flat", description="Type of index (flat, lsh, hnsw)")
+    distance_metric: str = Field(
+        default="cosine", description="Distance metric (cosine, euclidean, dot_product)"
+    )
+    # LSH specific parameters
+    n_hash_tables: int | None = Field(
+        None, description="Number of hash tables for LSH index (default: 5)"
+    )
+    n_hash_bits: int | None = Field(
+        None, description="Number of hash bits for LSH index (default: 8)"
+    )
+    # HNSW specific parameters
+    M: int | None = Field(
+        None, description="Number of bi-directional links for HNSW index (default: 16)"
+    )
+    ef_construction: int | None = Field(
+        None, description="Size of dynamic candidate list during construction for HNSW (default: 200)"
+    )
+    ef_search: int | None = Field(
+        None, description="Size of dynamic candidate list during search for HNSW (default: 50)"
+    )
+
+
 class LibraryMetadata(BaseModel):
     """Metadata associated with a library."""
 
@@ -39,6 +65,9 @@ class Library(BaseModel):
     )
     metadata: LibraryMetadata = Field(
         default_factory=LibraryMetadata, description="Associated metadata"
+    )
+    index_config: IndexConfig = Field(
+        default_factory=IndexConfig, description="Vector index configuration"
     )
     created_at: datetime = Field(
         default_factory=datetime.utcnow, description="Creation timestamp"
@@ -73,6 +102,9 @@ class LibraryCreate(BaseModel):
     )
     metadata: LibraryMetadata = Field(
         default_factory=LibraryMetadata, description="Associated metadata"
+    )
+    index_config: IndexConfig = Field(
+        default_factory=IndexConfig, description="Vector index configuration"
     )
 
 
