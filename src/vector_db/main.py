@@ -1,5 +1,7 @@
 """Main application entry point."""
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -13,6 +15,21 @@ from vector_db.core.exceptions import (
     ValidationException,
     VectorDBException,
 )
+from vector_db.core.persistence.database import init_database, close_database
+from vector_db.core.settings import Settings as PersistenceSettings
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan - startup and shutdown events."""
+    # Startup: Initialize database
+    persistence_settings = PersistenceSettings()
+    await init_database(persistence_settings.DATABASE_PATH)
+
+    yield
+
+    # Shutdown: Close database connection
+    await close_database()
 
 
 def create_app() -> FastAPI:
@@ -23,6 +40,7 @@ def create_app() -> FastAPI:
         openapi_url=f"{settings.API_V1_PREFIX}/openapi.json",
         docs_url=f"{settings.API_V1_PREFIX}/docs",
         redoc_url=f"{settings.API_V1_PREFIX}/redoc",
+        lifespan=lifespan,
     )
 
     # Add CORS middleware
