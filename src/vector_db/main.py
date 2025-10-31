@@ -17,6 +17,7 @@ from vector_db.core.exceptions import (
 )
 from vector_db.core.persistence.database import init_database, close_database
 from vector_db.core.settings import Settings as PersistenceSettings
+from vector_db.repositories.registry import initialize_repositories
 
 
 @asynccontextmanager
@@ -25,6 +26,9 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize database
     persistence_settings = PersistenceSettings()
     await init_database(persistence_settings.DATABASE_PATH)
+
+    # Initialize repositories (loads data from disk into memory)
+    await initialize_repositories()
 
     yield
 
