@@ -6,7 +6,8 @@ This example demonstrates how to use the Vector DB SDK to:
 3. Add chunks with embeddings using Cohere
 4. Search for similar vectors with and without metadata filters
 5. Delete a chunk and observe updated search results
-6. Update and delete resources
+6. Update chunk content and observe how search results change
+7. Update and delete resources
 
 Requirements:
 - Set COHERE_API_KEY in your .env file
@@ -196,9 +197,9 @@ def main():
         print("\n7. Deleting a chunk and re-running search...")
         # Delete one of the AI category chunks
         chunk_to_delete = chunks[-1]  # "Embeddings capture the meaning..."
-        print(f"  Deleting chunk: {chunk_to_delete.text[:50]}...")
+        print(f"  Deleting chunk: {chunk_to_delete.text}...")
         client.delete_chunk(chunk_to_delete.id)
-        print(f"✓ Deleted chunk: {str(chunk_to_delete.id)[:8]}...")
+        print(f"✓ Deleted chunk: {str(chunk_to_delete.id)}")
 
         # Search again with the same query
         print(f"\n  Re-running search with same query...")
@@ -219,22 +220,56 @@ def main():
         # Remove the deleted chunk from our list
         chunks.remove(chunk_to_delete)
 
-        # 8. Update a document
-        print("\n8. Updating document...")
+        # 8. Update a chunk and show updated search results
+        print("\n8. Updating a chunk's content and re-running search...")
+        # Update one chunk to have completely different content
+        chunk_to_update = chunks[3]  # "Machine learning models can understand text semantically"
+        new_text = "The Ming Dynasty ruled China from 1368 to 1644 and was known for its cultural achievements"
+        print(f"  Original text: {chunk_to_update.text[:50]}...")
+        print(f"  New text: {new_text}")
+
+        # Generate new embedding for the updated text
+        new_embedding = generate_embeddings([new_text], cohere_client)[0]
+
+        # Update the chunk with new text and embedding
+        updated_chunk = client.update_chunk(
+            chunk_id=chunk_to_update.id,
+            text=new_text,
+            embedding=new_embedding
+        )
+        print(f"✓ Updated chunk: {str(updated_chunk.id)}")
+
+        # Search again with the same query (no filters)
+        print(f"\n  Re-running search with same AI query...")
+        results_after_update = client.search_library(
+            library_id=library.id,
+            query=query_vector,
+            top_k=3
+        )
+
+        print(f"✓ Search completed")
+        print(f"  Found {results_after_update.total_results} results:")
+        print(f"  Note: The updated chunk about 'Ming Dynasty' is now less relevant to the AI query")
+        for i, result in enumerate(results_after_update.results, 1):
+            print(f"  {i}. Score: {result.score:.4f}")
+            print(f"     Text: {result.chunk.text[:60]}...")
+
+        # 9. Update a document
+        print("\n9. Updating document...")
         updated_document = client.update_document(
             document_id=document.id, name="Updated Example Document"
         )
         print(f"✓ Updated document name to: {updated_document.name}")
 
-        # 9. Update a library
-        print("\n9. Updating library...")
+        # 10. Update a library
+        print("\n10. Updating library...")
         updated_library = client.update_library(
             library_id=library.id, name="Updated SDK Example Library"
         )
         print(f"✓ Updated library name to: {updated_library.name}")
 
-        # 10. Clean up - delete remaining resources
-        print("\n10. Cleaning up remaining resources...")
+        # 11. Clean up - delete remaining resources
+        print("\n11. Cleaning up remaining resources...")
 
         # Delete chunks
         for chunk in chunks:

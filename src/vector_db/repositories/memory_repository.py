@@ -370,6 +370,35 @@ class LibraryRepository(InMemoryRepository[Library]):
                 return index.remove(chunk_id)
             return False
 
+    def update_chunk_in_index(self, library_id: UUID, chunk: Chunk) -> bool:
+        """
+        Update a chunk in the library's index.
+
+        Uses write lock for exclusive access during modification.
+
+        Args:
+            library_id: ID of the library
+            chunk: Updated chunk with new embedding
+
+        Returns:
+            True if updated, False if not found
+        """
+        # Verify library exists
+        self.get(library_id)
+
+        if library_id not in self._library_locks:
+            return False
+
+        # Use write lock for exclusive access
+        with self._library_locks[library_id].write():
+            index = self._indexes.get(library_id)
+            if index:
+                # Remove old chunk and add updated chunk
+                index.remove(chunk.id)
+                index.add(chunk)
+                return True
+            return False
+
     def search(self, library_id: UUID, query: VectorQuery) -> SearchResponse:
         """
         Search for similar vectors in a library.

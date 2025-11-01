@@ -168,6 +168,9 @@ class ChunkService:
             NotFoundException: If chunk not found
         """
         chunk_repo = get_chunk_repository()
+        document_repo = get_document_repository()
+        library_repo = get_library_repository()
+
         chunk = await chunk_repo.get(chunk_id)
 
         if chunk_update.text is not None:
@@ -178,7 +181,18 @@ class ChunkService:
             chunk.metadata = chunk_update.metadata
 
         chunk.updated_at = datetime.utcnow()
-        return await chunk_repo.update(chunk_id, chunk)
+        updated_chunk = await chunk_repo.update(chunk_id, chunk)
+
+        # Update document timestamp
+        document = await document_repo.get(chunk.document_id)
+        document.updated_at = datetime.utcnow()
+        await document_repo.update(document.id, document)
+
+        # Update in vector index if embedding changed
+        if chunk_update.embedding is not None:
+            await library_repo.update_chunk_in_index(document.library_id, updated_chunk)
+
+        return updated_chunk
 
     async def delete_chunk(self, chunk_id: UUID) -> None:
         """

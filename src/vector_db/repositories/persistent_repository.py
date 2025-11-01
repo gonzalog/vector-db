@@ -321,6 +321,43 @@ class PersistentLibraryRepository:
 
             return removed
 
+    async def update_chunk_in_index(self, library_id: UUID, chunk: Chunk) -> bool:
+        """Update a chunk in the library's index."""
+        if library_id not in self._library_locks:
+            return False
+
+        with self._library_locks[library_id].write():
+            index = self._indexes.get(library_id)
+            if not index:
+                return False
+
+            # Get the vector index for this chunk
+            vector_index = self._chunk_vector_indices.get(chunk.id)
+            if vector_index is None:
+                return False
+
+            # Get current vectors array
+            vectors = self._vectors.get(library_id)
+            if vectors is None:
+                return False
+
+            # Update the vector at the same position
+            embedding_array = np.array(chunk.embedding, dtype=np.float32)
+            vectors[vector_index] = embedding_array
+
+            # Update cache
+            self._vectors[library_id] = vectors
+
+            # Update index (remove old, add new)
+            index.remove(chunk.id)
+            index.add(chunk)
+
+            # Save to disk
+            self.vector_storage.save(str(library_id), vectors)
+            self.index_storage.save(str(library_id), index)
+
+            return True
+
     def search(self, library_id: UUID, query: VectorQuery) -> SearchResponse:
         """Search for similar vectors in a library."""
         # Verify library exists
