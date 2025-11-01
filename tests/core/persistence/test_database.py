@@ -5,6 +5,7 @@ import pytest_asyncio
 from pathlib import Path
 import tempfile
 import shutil
+from sqlalchemy import text
 
 from vector_db.core.persistence.database import Database, init_database, close_database
 
@@ -25,11 +26,12 @@ async def test_database_initialization(temp_db_path):
     db = Database(temp_db_path)
     await db.connect()
 
-    # Check that tables were created
-    async with db.conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-    ) as cursor:
-        tables = [row[0] for row in await cursor.fetchall()]
+    # Check that tables were created using SQLAlchemy
+    async with db.get_session() as session:
+        result = await session.execute(
+            text("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+        )
+        tables = [row[0] for row in result.fetchall()]
 
     assert "libraries" in tables
     assert "documents" in tables
@@ -44,9 +46,10 @@ async def test_database_foreign_keys_enabled(temp_db_path):
     db = Database(temp_db_path)
     await db.connect()
 
-    async with db.conn.execute("PRAGMA foreign_keys") as cursor:
-        result = await cursor.fetchone()
-        assert result[0] == 1  # Foreign keys enabled
+    async with db.get_session() as session:
+        result = await session.execute(text("PRAGMA foreign_keys"))
+        row = result.fetchone()
+        assert row[0] == 1  # Foreign keys enabled
 
     await db.disconnect()
 
@@ -60,7 +63,7 @@ async def test_init_database_global():
 
         db = await init_database(db_path)
         assert db is not None
-        assert db.conn is not None
+        assert db.session_factory is not None
 
         await close_database()
     finally:
