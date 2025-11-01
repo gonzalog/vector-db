@@ -110,6 +110,68 @@ class GraphLayer:
         """Remove all nodes and connections."""
         self._connections.clear()
 
+    def search(
+        self,
+        query_chunk: Chunk,
+        entry_points: list[UUID],
+        num_closest: int,
+        chunks: dict[UUID, Chunk],
+        distance_fn,
+    ) -> list[tuple[float, UUID]]:
+        """
+        Search for nearest neighbors within this layer.
+
+        Args:
+            query_chunk: Query chunk
+            entry_points: Starting points for search
+            num_closest: Number of closest nodes to find
+            chunks: Chunk storage for retrieving actual chunks
+            distance_fn: Function to compute distance between chunks
+
+        Returns:
+            List of (distance, node_id) tuples
+        """
+        visited: set[UUID] = set()
+        candidates: list[tuple[float, UUID]] = []
+        w: list[tuple[float, UUID]] = []
+
+        # Initialize with entry points
+        for ep_id in entry_points:
+            if ep_id not in chunks:
+                continue
+            ep_chunk = chunks[ep_id]
+            dist = distance_fn(query_chunk, ep_chunk)
+            heapq.heappush(candidates, (-dist, ep_id))  # Max heap (negative distance)
+            heapq.heappush(w, (dist, ep_id))  # Min heap
+            visited.add(ep_id)
+
+        while candidates:
+            # Get closest candidate
+            current_dist, current_id = heapq.heappop(candidates)
+            current_dist = -current_dist  # Convert back to positive
+
+            # If this is farther than the worst result, we're done
+            if current_dist > w[0][0] and len(w) >= num_closest:
+                break
+
+            # Explore neighbors
+            for neighbor_id in self.get_neighbors(current_id):
+                if neighbor_id not in visited and neighbor_id in chunks:
+                    visited.add(neighbor_id)
+                    neighbor_chunk = chunks[neighbor_id]
+                    dist = distance_fn(query_chunk, neighbor_chunk)
+
+                    # If better than worst result, add to candidates
+                    if dist < w[0][0] or len(w) < num_closest:
+                        heapq.heappush(candidates, (-dist, neighbor_id))
+                        heapq.heappush(w, (dist, neighbor_id))
+
+                        # Keep only num_closest best results
+                        if len(w) > num_closest:
+                            heapq.heappop(w)
+
+        return w
+
 
 class HNSWIndex(VectorIndex):
     """
@@ -192,6 +254,8 @@ class HNSWIndex(VectorIndex):
         """
         Search for nearest neighbors in a specific layer.
 
+        Delegates to the GraphLayer's search method.
+
         Args:
             query_chunk: Query chunk
             entry_points: List of entry point node IDs
@@ -201,47 +265,16 @@ class HNSWIndex(VectorIndex):
         Returns:
             List of (distance, node_id) tuples
         """
-        visited: set[UUID] = set()
-        candidates: list[tuple[float, UUID]] = []
-        w: list[tuple[float, UUID]] = []
+        if layer >= len(self._layers):
+            return []
 
-        # Initialize with entry points
-        for ep_id in entry_points:
-            if ep_id not in self._chunks:
-                continue
-            ep_chunk = self._chunks[ep_id]
-            dist = self._get_distance(query_chunk, ep_chunk)
-            heapq.heappush(candidates, (-dist, ep_id))  # Max heap (negative distance)
-            heapq.heappush(w, (dist, ep_id))  # Min heap
-            visited.add(ep_id)
-
-        while candidates:
-            # Get closest candidate
-            current_dist, current_id = heapq.heappop(candidates)
-            current_dist = -current_dist  # Convert back to positive
-
-            # If this is farther than the worst result, we're done
-            if current_dist > w[0][0] and len(w) >= num_closest:
-                break
-
-            # Explore neighbors
-            if layer < len(self._layers):
-                for neighbor_id in self._layers[layer].get_neighbors(current_id):
-                    if neighbor_id not in visited and neighbor_id in self._chunks:
-                        visited.add(neighbor_id)
-                        neighbor_chunk = self._chunks[neighbor_id]
-                        dist = self._get_distance(query_chunk, neighbor_chunk)
-
-                        # If better than worst result, add to candidates
-                        if dist < w[0][0] or len(w) < num_closest:
-                            heapq.heappush(candidates, (-dist, neighbor_id))
-                            heapq.heappush(w, (dist, neighbor_id))
-
-                            # Keep only num_closest best results
-                            if len(w) > num_closest:
-                                heapq.heappop(w)
-
-        return w
+        return self._layers[layer].search(
+            query_chunk=query_chunk,
+            entry_points=entry_points,
+            num_closest=num_closest,
+            chunks=self._chunks,
+            distance_fn=self._get_distance,
+        )
 
     def _get_neighbors(
         self, candidates: list[tuple[float, UUID]], M: int
