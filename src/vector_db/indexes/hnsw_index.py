@@ -12,6 +12,105 @@ from vector_db.indexes.distance import DistanceMetric, get_distance_function
 from vector_db.models import Chunk
 
 
+class GraphLayer:
+    """
+    Represents a single layer in the HNSW graph structure.
+
+    Each layer maintains bidirectional connections between nodes.
+    """
+
+    def __init__(self):
+        """Initialize an empty graph layer."""
+        self._connections: dict[UUID, list[UUID]] = {}
+
+    def add_node(self, node_id: UUID) -> None:
+        """
+        Add a node to the layer with no connections.
+
+        Args:
+            node_id: Node to add
+        """
+        if node_id not in self._connections:
+            self._connections[node_id] = []
+
+    def get_neighbors(self, node_id: UUID) -> list[UUID]:
+        """
+        Get all neighbors of a node.
+
+        Args:
+            node_id: Node ID
+
+        Returns:
+            List of neighbor node IDs
+        """
+        return self._connections.get(node_id, [])
+
+    def add_bidirectional_link(self, node1: UUID, node2: UUID) -> None:
+        """
+        Add a bidirectional connection between two nodes.
+
+        Args:
+            node1: First node
+            node2: Second node
+        """
+        if node1 not in self._connections:
+            self._connections[node1] = []
+        if node2 not in self._connections:
+            self._connections[node2] = []
+
+        if node2 not in self._connections[node1]:
+            self._connections[node1].append(node2)
+        if node1 not in self._connections[node2]:
+            self._connections[node2].append(node1)
+
+    def set_neighbors(self, node_id: UUID, neighbors: list[UUID]) -> None:
+        """
+        Set the complete neighbor list for a node.
+
+        Args:
+            node_id: Node ID
+            neighbors: New list of neighbors
+        """
+        self._connections[node_id] = neighbors
+
+    def remove_node(self, node_id: UUID) -> None:
+        """
+        Remove a node and all its connections.
+
+        Args:
+            node_id: Node to remove
+        """
+        # Remove outgoing connections
+        if node_id in self._connections:
+            # Remove incoming connections from neighbors
+            for neighbor_id in self._connections[node_id]:
+                if neighbor_id in self._connections:
+                    self._connections[neighbor_id] = [
+                        nid for nid in self._connections[neighbor_id] if nid != node_id
+                    ]
+            del self._connections[node_id]
+
+        # Remove any remaining incoming connections
+        for nid in self._connections:
+            self._connections[nid] = [n for n in self._connections[nid] if n != node_id]
+
+    def contains(self, node_id: UUID) -> bool:
+        """
+        Check if a node exists in this layer.
+
+        Args:
+            node_id: Node to check
+
+        Returns:
+            True if node exists
+        """
+        return node_id in self._connections
+
+    def clear(self) -> None:
+        """Remove all nodes and connections."""
+        self._connections.clear()
+
+
 class HNSWIndex(VectorIndex):
     """
     HNSW (Hierarchical Navigable Small World) index.
@@ -47,8 +146,8 @@ class HNSWIndex(VectorIndex):
         self.ef_search = ef_search
         self.ml = 1.0 / np.log(2.0)  # Normalization factor for level assignment
 
-        # Graph structure: layer -> node_id -> list of neighbor node_ids
-        self._graphs: list[dict[UUID, list[UUID]]] = [{}]
+        # Graph structure: list of layers
+        self._layers: list[GraphLayer] = [GraphLayer()]
 
         # Chunk storage
         self._chunks: dict[UUID, Chunk] = {}
@@ -126,8 +225,8 @@ class HNSWIndex(VectorIndex):
                 break
 
             # Explore neighbors
-            if layer < len(self._graphs) and current_id in self._graphs[layer]:
-                for neighbor_id in self._graphs[layer][current_id]:
+            if layer < len(self._layers):
+                for neighbor_id in self._layers[layer].get_neighbors(current_id):
                     if neighbor_id not in visited and neighbor_id in self._chunks:
                         visited.add(neighbor_id)
                         neighbor_chunk = self._chunks[neighbor_id]
@@ -183,13 +282,12 @@ class HNSWIndex(VectorIndex):
             level = self._select_level()
 
             # Ensure we have enough layers
-            while len(self._graphs) <= level:
-                self._graphs.append({})
+            while len(self._layers) <= level:
+                self._layers.append(GraphLayer())
 
-            # Initialize connections for all layers
+            # Initialize node in all layers from 0 to level
             for lc in range(level + 1):
-                if chunk.id not in self._graphs[lc]:
-                    self._graphs[lc][chunk.id] = []
+                self._layers[lc].add_node(chunk.id)
 
             # If this is the first element, set as entry point
             if self._entry_point is None:
@@ -202,7 +300,7 @@ class HNSWIndex(VectorIndex):
 
             # Search from top layer to target layer
             for lc in range(self._entry_point_layer, level, -1):
-                nearest = self._search_layer(chunk, nearest, 1, min(lc, len(self._graphs) - 1))
+                nearest = self._search_layer(chunk, nearest, 1, min(lc, len(self._layers) - 1))
                 nearest = [node_id for _, node_id in nearest]
 
             # Insert into all layers from level down to 0
@@ -217,33 +315,29 @@ class HNSWIndex(VectorIndex):
 
                 # Add bidirectional links
                 for neighbor_id in neighbors:
-                    # Add link from new node to neighbor
-                    if neighbor_id not in self._graphs[lc][chunk.id]:
-                        self._graphs[lc][chunk.id].append(neighbor_id)
+                    self._layers[lc].add_bidirectional_link(chunk.id, neighbor_id)
 
-                    # Add link from neighbor to new node
-                    if neighbor_id in self._graphs[lc]:
-                        if chunk.id not in self._graphs[lc][neighbor_id]:
-                            self._graphs[lc][neighbor_id].append(chunk.id)
+                    # Prune neighbor's connections if necessary
+                    M_max = self.M_max_0 if lc == 0 else self.M_max
+                    neighbor_connections = self._layers[lc].get_neighbors(neighbor_id)
 
-                        # Prune neighbors if necessary
-                        M_max = self.M_max_0 if lc == 0 else self.M_max
-                        if len(self._graphs[lc][neighbor_id]) > M_max:
-                            # Recompute distances and prune
-                            neighbor_chunk = self._chunks[neighbor_id]
-                            neighbor_connections = [
-                                (
-                                    self._get_distance(
-                                        neighbor_chunk, self._chunks[conn_id]
-                                    ),
-                                    conn_id,
-                                )
-                                for conn_id in self._graphs[lc][neighbor_id]
-                                if conn_id in self._chunks
-                            ]
-                            self._graphs[lc][neighbor_id] = self._get_neighbors(
-                                neighbor_connections, M_max
+                    if len(neighbor_connections) > M_max:
+                        # Recompute distances and prune
+                        neighbor_chunk = self._chunks[neighbor_id]
+                        connections_with_distances = [
+                            (
+                                self._get_distance(
+                                    neighbor_chunk, self._chunks[conn_id]
+                                ),
+                                conn_id,
                             )
+                            for conn_id in neighbor_connections
+                            if conn_id in self._chunks
+                        ]
+                        pruned_neighbors = self._get_neighbors(
+                            connections_with_distances, M_max
+                        )
+                        self._layers[lc].set_neighbors(neighbor_id, pruned_neighbors)
 
                 nearest = neighbors
 
@@ -306,7 +400,7 @@ class HNSWIndex(VectorIndex):
             # Search from top layer to layer 0
             nearest = [self._entry_point]
             for lc in range(self._entry_point_layer, 0, -1):
-                nearest = self._search_layer(query_chunk, nearest, 1, min(lc, len(self._graphs) - 1))
+                nearest = self._search_layer(query_chunk, nearest, 1, min(lc, len(self._layers) - 1))
                 nearest = [node_id for _, node_id in nearest]
 
             # Search at layer 0 with ef_search
@@ -338,21 +432,9 @@ class HNSWIndex(VectorIndex):
             if chunk_id not in self._chunks:
                 return False
 
-            # Remove all connections
-            for layer in self._graphs:
-                # Remove outgoing connections
-                if chunk_id in layer:
-                    # For each neighbor, remove connection back to this node
-                    for neighbor_id in layer[chunk_id]:
-                        if neighbor_id in layer:
-                            layer[neighbor_id] = [
-                                nid for nid in layer[neighbor_id] if nid != chunk_id
-                            ]
-                    del layer[chunk_id]
-
-                # Remove incoming connections from other nodes
-                for node_id in layer:
-                    layer[node_id] = [nid for nid in layer[node_id] if nid != chunk_id]
+            # Remove from all layers
+            for layer in self._layers:
+                layer.remove_node(chunk_id)
 
             # Remove chunk
             del self._chunks[chunk_id]
@@ -364,8 +446,8 @@ class HNSWIndex(VectorIndex):
                     self._entry_point = next(iter(self._chunks.keys()))
                     # Find its layer
                     self._entry_point_layer = 0
-                    for lc, layer in enumerate(self._graphs):
-                        if self._entry_point in layer:
+                    for lc, layer in enumerate(self._layers):
+                        if layer.contains(self._entry_point):
                             self._entry_point_layer = lc
                 else:
                     self._entry_point = None
@@ -376,7 +458,7 @@ class HNSWIndex(VectorIndex):
     def clear(self) -> None:
         """Remove all chunks from the index."""
         with self._lock.write():
-            self._graphs = [{}]
+            self._layers = [GraphLayer()]
             self._chunks.clear()
             self._entry_point = None
             self._entry_point_layer = 0
