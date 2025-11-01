@@ -18,3 +18,6 @@ wheels/
 
 # Data directory (runtime persistence files)
 data/
+
+# Jupyter Notebook checkpoints
+examples/.ipynb_checkpoints/
