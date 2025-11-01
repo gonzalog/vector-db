@@ -4,8 +4,9 @@ This example demonstrates how to use the Vector DB SDK to:
 1. Create a library
 2. Create documents
 3. Add chunks with embeddings using Cohere
-4. Search for similar vectors
-5. Update and delete resources
+4. Search for similar vectors with and without metadata filters
+5. Delete a chunk and observe updated search results
+6. Update and delete resources
 
 Requirements:
 - Set COHERE_API_KEY in your .env file
@@ -191,22 +192,49 @@ def main():
         document_chunks = client.get_document_chunks(document_id=document.id)
         print(f"✓ Retrieved {len(document_chunks)} chunks")
 
-        # 7. Update a document
-        print("\n7. Updating document...")
+        # 7. Delete a chunk and show updated search results
+        print("\n7. Deleting a chunk and re-running search...")
+        # Delete one of the AI category chunks
+        chunk_to_delete = chunks[-1]  # "Embeddings capture the meaning..."
+        print(f"  Deleting chunk: {chunk_to_delete.text[:50]}...")
+        client.delete_chunk(chunk_to_delete.id)
+        print(f"✓ Deleted chunk: {str(chunk_to_delete.id)[:8]}...")
+
+        # Search again with the same query
+        print(f"\n  Re-running search with same query...")
+        results_after_delete = client.search_library(
+            library_id=library.id,
+            query=query_vector,
+            top_k=3,
+            filters={"category": "ai"}
+        )
+
+        print(f"✓ Search completed")
+        print(f"  Found {results_after_delete.total_results} results (was {results_filtered.total_results} before deletion):")
+        for i, result in enumerate(results_after_delete.results, 1):
+            print(f"  {i}. Score: {result.score:.4f}")
+            print(f"     Category: {result.chunk.metadata.custom.get('category', 'N/A')}")
+            print(f"     Text: {result.chunk.text}")
+
+        # Remove the deleted chunk from our list
+        chunks.remove(chunk_to_delete)
+
+        # 8. Update a document
+        print("\n8. Updating document...")
         updated_document = client.update_document(
             document_id=document.id, name="Updated Example Document"
         )
         print(f"✓ Updated document name to: {updated_document.name}")
 
-        # 8. Update a library
-        print("\n8. Updating library...")
+        # 9. Update a library
+        print("\n9. Updating library...")
         updated_library = client.update_library(
             library_id=library.id, name="Updated SDK Example Library"
         )
         print(f"✓ Updated library name to: {updated_library.name}")
 
-        # 9. Clean up - delete resources
-        print("\n9. Cleaning up resources...")
+        # 10. Clean up - delete remaining resources
+        print("\n10. Cleaning up remaining resources...")
 
         # Delete chunks
         for chunk in chunks:
