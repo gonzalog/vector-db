@@ -59,12 +59,7 @@ class ChunkService:
         document.updated_at = datetime.utcnow()
         await document_repo.update(document_id, document)
 
-        # Add to index
-        try:
-            await library_repo.add_chunk_to_index(document.library_id, chunk)
-        except Exception:
-            # Index errors shouldn't fail chunk creation
-            pass
+        await library_repo.add_chunk_to_index(document.library_id, chunk)
 
         return chunk
 
