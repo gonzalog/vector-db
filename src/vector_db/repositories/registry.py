@@ -1,10 +1,8 @@
 """Repository registry for managing singleton persistent repositories."""
 
-from vector_db.repositories.persistent_repository import PersistentLibraryRepository
-from vector_db.repositories.persistent_document_chunk import (
-    PersistentDocumentRepository,
-    PersistentChunkRepository,
-)
+from vector_db.repositories.persistent_library import PersistentLibraryRepository
+from vector_db.repositories.persistent_document import PersistentDocumentRepository
+from vector_db.repositories.persistent_chunk import PersistentChunkRepository
 
 
 # Singleton instances (will be initialized on app startup)

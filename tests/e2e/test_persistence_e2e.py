@@ -11,7 +11,7 @@ import numpy as np
 
 from vector_db.core.persistence.database import init_database, close_database
 from vector_db.core.settings import Settings
-from vector_db.repositories.persistent_repository import PersistentLibraryRepository
+from vector_db.repositories.persistent_library import PersistentLibraryRepository
 from vector_db.models import Library, Chunk, IndexConfig
 
 
