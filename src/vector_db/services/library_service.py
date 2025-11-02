@@ -10,6 +10,8 @@ from vector_db.models import (
     LibraryCreate,
     LibraryUpdate,
     PaginatedResponse,
+    SearchResponse,
+    VectorQuery,
 )
 from vector_db.repositories.registry import (
     get_library_repository,
@@ -167,6 +169,23 @@ class LibraryService:
         # Get documents from repository
         documents, _ = await document_repo.get_paginated_by_library(library_id, 0, 10000)
         return documents
+
+    def search_library(self, library_id: UUID, query: VectorQuery) -> SearchResponse:
+        """
+        Search for similar vectors in a library.
+
+        Args:
+            library_id: The library ID
+            query: Vector query with embedding and filters
+
+        Returns:
+            Search response with results
+
+        Raises:
+            NotFoundException: If library not found
+        """
+        library_repo = get_library_repository()
+        return library_repo.search(library_id, query)
 
 
 # Singleton instance

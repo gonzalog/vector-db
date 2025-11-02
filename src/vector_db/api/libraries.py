@@ -14,7 +14,6 @@ from vector_db.models import (
     SearchResponse,
     VectorQuery,
 )
-from vector_db.repositories.registry import get_library_repository
 from vector_db.services.library_service import library_service
 
 router = APIRouter(prefix="/libraries", tags=["libraries"])
@@ -74,5 +73,4 @@ def get_library_documents(library_id: UUID) -> list[Document]:
 )
 def search_library(library_id: UUID, query: VectorQuery) -> SearchResponse:
     """Search for similar vectors in a library."""
-    library_repo = get_library_repository()
-    return library_repo.search(library_id, query)
+    return library_service.search_library(library_id, query)
