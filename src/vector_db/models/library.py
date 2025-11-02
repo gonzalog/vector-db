@@ -1,37 +1,67 @@
 """Library model definition."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+
+# Valid index types and distance metrics
+VALID_INDEX_TYPES = {"flat", "lsh", "hnsw"}
+VALID_DISTANCE_METRICS = {"cosine", "euclidean", "dot_product"}
 
 
 class IndexConfig(BaseModel):
     """Configuration for vector index."""
 
-    index_type: str = Field(default="flat", description="Type of index (flat, lsh, hnsw)")
-    distance_metric: str = Field(
+    index_type: Literal["flat", "lsh", "hnsw"] = Field(
+        default="flat", description="Type of index (flat, lsh, hnsw)"
+    )
+    distance_metric: Literal["cosine", "euclidean", "dot_product"] = Field(
         default="cosine", description="Distance metric (cosine, euclidean, dot_product)"
     )
     # LSH specific parameters
     n_hash_tables: int | None = Field(
-        None, description="Number of hash tables for LSH index (default: 5)"
+        None, description="Number of hash tables for LSH index (default: 5)", gt=0
     )
     n_hash_bits: int | None = Field(
-        None, description="Number of hash bits for LSH index (default: 8)"
+        None, description="Number of hash bits for LSH index (default: 8)", gt=0
     )
     # HNSW specific parameters
     M: int | None = Field(
-        None, description="Number of bi-directional links for HNSW index (default: 16)"
+        None, description="Number of bi-directional links for HNSW index (default: 16)", gt=0
     )
     ef_construction: int | None = Field(
-        None, description="Size of dynamic candidate list during construction for HNSW (default: 200)"
+        None,
+        description="Size of dynamic candidate list during construction for HNSW (default: 200)",
+        gt=0,
     )
     ef_search: int | None = Field(
-        None, description="Size of dynamic candidate list during search for HNSW (default: 50)"
+        None,
+        description="Size of dynamic candidate list during search for HNSW (default: 50)",
+        gt=0,
     )
+
+    @field_validator("n_hash_tables", "n_hash_bits")
+    @classmethod
+    def validate_lsh_params(cls, v: int | None, info) -> int | None:
+        """Validate LSH-specific parameters."""
+        if v is not None and info.data.get("index_type") != "lsh":
+            raise ValueError(
+                f"{info.field_name} can only be set for LSH index type"
+            )
+        return v
+
+    @field_validator("M", "ef_construction", "ef_search")
+    @classmethod
+    def validate_hnsw_params(cls, v: int | None, info) -> int | None:
+        """Validate HNSW-specific parameters."""
+        if v is not None and info.data.get("index_type") != "hnsw":
+            raise ValueError(
+                f"{info.field_name} can only be set for HNSW index type"
+            )
+        return v
 
 
 class LibraryMetadata(BaseModel):

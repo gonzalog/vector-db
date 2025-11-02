@@ -134,7 +134,9 @@ class VectorDBClient:
         name: str,
         index_type: str = "flat",
         distance_metric: str = "cosine",
-        **kwargs,
+        metadata: dict | None = None,
+        index_config: dict | None = None,
+        **index_params,
     ) -> Library:
         """Create a new library.
 
@@ -142,18 +144,34 @@ class VectorDBClient:
             name: Name of the library
             index_type: Type of vector index (flat, lsh, hnsw)
             distance_metric: Distance metric (cosine, euclidean, dot_product)
-            **kwargs: Additional library creation parameters
+            metadata: Optional library metadata
+            index_config: Optional complete index config dict
+            **index_params: Index-specific parameters (M, ef_construction, n_hash_tables, etc.)
 
         Returns:
             Created library object
         """
-        data = LibraryCreate(
-            name=name,
-            index_type=index_type,
-            distance_metric=distance_metric,
-            **kwargs,
-        ).model_dump(mode="json")
+        from vector_db.models import IndexConfig
 
+        # Build index config
+        if index_config is None:
+            index_config_obj = IndexConfig(
+                index_type=index_type,
+                distance_metric=distance_metric,
+                **index_params
+            )
+        else:
+            # Use provided index_config dict
+            index_config_obj = IndexConfig(**index_config)
+
+        # Build library create request
+        library_create = LibraryCreate(
+            name=name,
+            index_config=index_config_obj,
+            metadata=metadata or {}
+        )
+
+        data = library_create.model_dump(mode="json")
         response = self._make_request("POST", self._make_url("/libraries"), json=data)
         return Library(**self._handle_response(response))
 

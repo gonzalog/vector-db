@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   vector-db:
     build:
@@ -11,48 +9,6 @@ services:
     environment:
       # API Configuration
       - PROJECT_NAME=Vector DB API
-      - VERSION=0.1.0
-      - API_V1_PREFIX=/api/v1
-      - HOST=0.0.0.0
-      - PORT=8000
-      - ENVIRONMENT=production
-
-      # CORS Settings
-      - BACKEND_CORS_ORIGINS=*
-
-      # Logging
-      - LOG_LEVEL=INFO
-      - DEBUG=false
-
-      # API Keys (override with .env file)
-      - COHERE_API_KEY=${COHERE_API_KEY:-}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-
-    volumes:
-      # Persist database and data
-      - vector-db-data:/app/data
-
-    restart: unless-stopped
-
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 5s
-
-  # Development service with hot-reload
-  vector-db-dev:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: vector-db-api-dev
-    ports:
-      - "8000:8000"
-    environment:
-      # API Configuration
-      - PROJECT_NAME=Vector DB API (Dev)
       - VERSION=0.1.0
       - API_V1_PREFIX=/api/v1
       - HOST=0.0.0.0
@@ -73,17 +29,8 @@ services:
 
     volumes:
       # Persist database and data
-      - vector-db-data-dev:/app/data
+      - ./data:/app/data
       # Mount source code for hot-reload
       - ./src:/app/src
 
     command: ["uvicorn", "vector_db.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-
-    profiles:
-      - dev
-
-volumes:
-  vector-db-data:
-    driver: local
-  vector-db-data-dev:
-    driver: local
